@@ -196,7 +196,7 @@ public class PcapReader implements Iterable<Packet> {
 
     if (ipStart == -1) {
       if (log.isDebugEnabled()) {
-        log.debug(Hex.encodeHexString(packetData));
+        log.debug("Invalid IP packet: {}", Hex.encodeHexString(packetData));
       }
       return Packet.NULL;
     }
@@ -226,9 +226,6 @@ public class PcapReader implements Iterable<Packet> {
 
     int ipProtocolHeaderVersion = packet.getIpVersion();
     if (ipProtocolHeaderVersion == 4 || ipProtocolHeaderVersion == 6) {
-      // list with payloads ready for decode
-      byte[] tcpOrUdpPayload = new byte[0];
-
       /*
        * make sure there is no ethernet padding present. see: https://wiki.wireshark.org/Ethernet
        */
@@ -257,60 +254,26 @@ public class PcapReader implements Iterable<Packet> {
       }
 
       if (PROTOCOL_TCP == packet.getProtocol()) {
-        // found tcp protocol
-        tcpOrUdpPayload = tcpDecoder
-            .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
-        /*
-         * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
-         * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to
-         * start.
-         */
-        int tcpOrUdpPayloadIndex = 0;
-        while ((tcpOrUdpPayload.length > TCP_DNS_LENGTH_PREFIX)
-            && (tcpOrUdpPayloadIndex < tcpOrUdpPayload.length)) {
-          byte[] lenBytes = new byte[2];
-          System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, lenBytes, 0, 2);
-          int msgLen = PcapReaderUtil.convertShort(lenBytes);
-          // add the 2byte msg len
-          tcpOrUdpPayloadIndex += 2;
-          if ((tcpOrUdpPayloadIndex + msgLen) <= tcpOrUdpPayload.length) {
-            byte[] msgBytes = new byte[msgLen];
-            System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, msgBytes, 0, msgLen);
-            dnsBytes.add(msgBytes);
-            // add the msg len to the index
-            tcpOrUdpPayloadIndex += msgLen;
-          } else {
-            // invalid msg len
-            if (log.isDebugEnabled()) {
-              log
-                  .debug(
-                      "Invalid TCP payload length, msgLen= " + msgLen + " tcpOrUdpPayload.length= "
-                          + tcpOrUdpPayload.length + " ack=" + packet.isTcpFlagAck());
-            }
-            break;
-          }
-        }
-        if (log.isDebugEnabled() && dnsBytes.size() > 1) {
-          log.debug("multiple msg in TCP stream");
-        }
+        // found TCP protocol
+        dnsBytes = handleTCP(packet, packetData, ipStart);
       } else if (PROTOCOL_UDP == packet.getProtocol()) {
         // found UDP protocol
-        tcpOrUdpPayload = udpDecoder
-            .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
-        dnsBytes.add(tcpOrUdpPayload);
+        dnsBytes = handleUDP(packet, packetData, ipStart);
       }
 
-      if (packet.getFragOffset() == 0 && packet.getSrcPort() != PcapReader.DNS_PORT
-          && packet.getDstPort() != PcapReader.DNS_PORT) {
+      if (!isDNS(packet)) {
         // not a dns packet
         if (log.isDebugEnabled()) {
-          log.debug("NON DNS protocol: " + packet);
+          log.debug("Packet is not a DNS packet: " + packet);
         }
         return Packet.NULL;
       }
 
-      if (dnsBytes == null || dnsBytes.isEmpty()) {
+      if (dnsBytes.isEmpty()) {
         // no DNS packets found
+        if (log.isDebugEnabled()) {
+          log.debug("No valid DNS packet found: " + packet);
+        }
         return Packet.NULL;
       }
 
@@ -338,6 +301,61 @@ public class PcapReader implements Iterable<Packet> {
       }
     }
     return packet;
+  }
+
+
+  private boolean isDNS(Packet packet) {
+    return packet.getFragOffset() == 0 && (packet.getSrcPort() == PcapReader.DNS_PORT
+        || packet.getDstPort() == PcapReader.DNS_PORT);
+  }
+
+  private List<byte[]> handleUDP(Packet packet, byte[] packetData, int ipStart) {
+    List<byte[]> dnsBytes = new ArrayList<>();
+    byte[] tcpOrUdpPayload = udpDecoder
+        .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
+    if (tcpOrUdpPayload.length > 0) {
+      dnsBytes.add(tcpOrUdpPayload);
+    }
+    return dnsBytes;
+  }
+
+  private List<byte[]> handleTCP(Packet packet, byte[] packetData, int ipStart) {
+    List<byte[]> dnsBytes = new ArrayList<>();
+    byte[] tcpOrUdpPayload = tcpDecoder
+        .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
+    /*
+     * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
+     * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.
+     */
+    int tcpOrUdpPayloadIndex = 0;
+    while ((tcpOrUdpPayload.length > TCP_DNS_LENGTH_PREFIX)
+        && (tcpOrUdpPayloadIndex < tcpOrUdpPayload.length)) {
+      byte[] lenBytes = new byte[2];
+      System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, lenBytes, 0, 2);
+      int msgLen = PcapReaderUtil.convertShort(lenBytes);
+      // add the 2byte msg len
+      tcpOrUdpPayloadIndex += 2;
+      if ((tcpOrUdpPayloadIndex + msgLen) <= tcpOrUdpPayload.length) {
+        byte[] msgBytes = new byte[msgLen];
+        System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, msgBytes, 0, msgLen);
+        dnsBytes.add(msgBytes);
+        // add the msg len to the index
+        tcpOrUdpPayloadIndex += msgLen;
+      } else {
+        // invalid msg len
+        if (log.isDebugEnabled()) {
+          log
+              .debug("Invalid TCP payload length, msgLen= " + msgLen + " tcpOrUdpPayload.length= "
+                  + tcpOrUdpPayload.length + " ack=" + packet.isTcpFlagAck());
+        }
+        break;
+      }
+    }
+    if (log.isDebugEnabled() && dnsBytes.size() > 1) {
+      log.debug("multiple msg in TCP stream");
+    }
+
+    return dnsBytes;
   }
 
   protected boolean validateMagicNumber(byte[] pcapHeader) {

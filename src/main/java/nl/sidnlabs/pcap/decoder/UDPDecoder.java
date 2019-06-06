@@ -45,10 +45,14 @@ public class UDPDecoder {
     // if the offset == 0 then the payload contains the udp header, do not read the header, only get
     // the udp payload bytes
 
-    packet.setSrcPort(PcapReaderUtil.convertShort(packetData,
-        ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
-    packet.setDstPort(PcapReaderUtil.convertShort(packetData,
-        ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+    packet
+        .setSrcPort(PcapReaderUtil
+            .convertShort(packetData,
+                ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+    packet
+        .setDstPort(PcapReaderUtil
+            .convertShort(packetData,
+                ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     if (packet.getIpVersion() == 4) {
       int cksum = UDPUtil.getUdpChecksum(packetData, ipStart, ipHeaderLen);
@@ -69,7 +73,7 @@ public class UDPDecoder {
     if (packet.getFragOffset() == 0 && packet.getSrcPort() != PcapReader.DNS_PORT
         && packet.getDstPort() != PcapReader.DNS_PORT) {
       // not a dns packet
-      return null;
+      return new byte[0];
     }
 
     return packetPayload;

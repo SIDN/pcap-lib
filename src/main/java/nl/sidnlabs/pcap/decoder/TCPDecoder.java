@@ -50,10 +50,14 @@ public class TCPDecoder {
 
   public byte[] decode(Packet packet, byte[] packetData, int ipStart, int ipHeaderLen,
       int totalLength) {
-    packet.setSrcPort(PcapReaderUtil.convertShort(packetData,
-        ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
-    packet.setDstPort(PcapReaderUtil.convertShort(packetData,
-        ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+    packet
+        .setSrcPort(PcapReaderUtil
+            .convertShort(packetData,
+                ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+    packet
+        .setDstPort(PcapReaderUtil
+            .convertShort(packetData,
+                ipStart + ipHeaderLen + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData, ipStart + ipHeaderLen);
     if (tcpOrUdpHeaderSize == -1) {
@@ -62,10 +66,14 @@ public class TCPDecoder {
     packet.setTcpHeaderLen(tcpOrUdpHeaderSize);
 
     // Store the sequence and acknowledgement numbers --M
-    packet.setTcpSeq(PcapReaderUtil.convertUnsignedInt(packetData,
-        ipStart + ipHeaderLen + PROTOCOL_HEADER_TCP_SEQ_OFFSET));
-    packet.setTcpAck(PcapReaderUtil.convertUnsignedInt(packetData,
-        ipStart + ipHeaderLen + PROTOCOL_HEADER_TCP_ACK_OFFSET));
+    packet
+        .setTcpSeq(PcapReaderUtil
+            .convertUnsignedInt(packetData,
+                ipStart + ipHeaderLen + PROTOCOL_HEADER_TCP_SEQ_OFFSET));
+    packet
+        .setTcpAck(PcapReaderUtil
+            .convertUnsignedInt(packetData,
+                ipStart + ipHeaderLen + PROTOCOL_HEADER_TCP_ACK_OFFSET));
     // Flags stretch two bytes starting at the TCP header offset
     int flags = PcapReaderUtil
         .convertShort(new byte[] {packetData[ipStart + ipHeaderLen + TCP_HEADER_DATA_OFFSET],
@@ -84,8 +92,9 @@ public class TCPDecoder {
     packet.setTcpFlagFin((flags & 0x1) == 0 ? false : true);
 
     // WINDOW size
-    packet.setTcpWindowSize(PcapReaderUtil.convertShort(packetData,
-        ipStart + ipHeaderLen + PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
+    packet
+        .setTcpWindowSize(PcapReaderUtil
+            .convertShort(packetData, ipStart + ipHeaderLen + PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
 
     int payloadDataStart = ipStart + ipHeaderLen + tcpOrUdpHeaderSize;
     int payloadLength = totalLength - ipHeaderLen - tcpOrUdpHeaderSize;
@@ -127,7 +136,7 @@ public class TCPDecoder {
     if (packet.isTcpFlagFin() || packet.isTcpFlagPsh()) {
       // received signal to push the data received for this flow up the stack.
       Collection<SequencePayload> fragments = flows.removeAll(flow);
-      if (fragments != null && fragments.size() > 0) {
+      if (fragments != null && !fragments.isEmpty()) {
         packet.setReassembledTCPFragments(fragments.size());
         SequencePayload prev = null;
 
@@ -142,16 +151,18 @@ public class TCPDecoder {
         // copy all the payload bytes
         for (SequencePayload seqPayload : fragments) {
           if (prev != null && !seqPayload.linked(prev)) {
-            log.warn("Broken sequence chain between " + seqPayload + " and " + prev
-                + ". Returning empty payload.");
+            log
+                .warn("Broken sequence chain between " + seqPayload + " and " + prev
+                    + ". Returning empty payload.");
             packetPayload = EMPTY_PAYLOAD;
             tcpPrefixError++;
             // got chain linkage error, ignore all flow data return nothing. (these bytes will be
             // ubnparseble)
             break;
           }
-          System.arraycopy(seqPayload.getPayload(), 0, packetPayload, destPos,
-              seqPayload.getPayload().length);
+          System
+              .arraycopy(seqPayload.getPayload(), 0, packetPayload, destPos,
+                  seqPayload.getPayload().length);
           destPos += seqPayload.getPayload().length;
 
           prev = seqPayload;

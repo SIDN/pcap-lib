@@ -44,16 +44,18 @@ public class SequencePayload implements Comparable<SequencePayload> {
 
   @Override
   public int compareTo(SequencePayload o) {
-    return ComparisonChain.start().compare(seq, o.seq).compare(payload.length, o.payload.length)
+    return ComparisonChain
+        .start()
+        .compare(seq, o.seq)
+        .compare(payload.length, o.payload.length)
         .result();
   }
 
   public boolean linked(SequencePayload o) {
     if ((seq + payload.length) == o.seq)
       return true;
-    if ((o.seq + o.payload.length) == seq)
-      return true;
-    return false;
+
+    return (o.seq + o.payload.length) == seq;
   }
 
 }

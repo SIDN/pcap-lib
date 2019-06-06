@@ -37,16 +37,18 @@ public class DatagramPayload implements Comparable<DatagramPayload> {
 
   @Override
   public int compareTo(DatagramPayload o) {
-    return ComparisonChain.start().compare(offset, o.offset)
-        .compare(payload.length, o.payload.length).result();
+    return ComparisonChain
+        .start()
+        .compare(offset, o.offset)
+        .compare(payload.length, o.payload.length)
+        .result();
   }
 
   public boolean linked(DatagramPayload o) {
     if ((offset + payload.length) == o.offset)
       return true;
-    if ((o.offset + o.payload.length) == offset)
-      return true;
-    return false;
+
+    return (o.offset + o.payload.length) == offset;
   }
 
 }
