@@ -33,7 +33,7 @@
   </scm>
 
 	<properties>
-		<sidn-dnslib>0.1.4</sidn-dnslib>
+		<sidn-dnslib>0.1.5-SNAPSHOT</sidn-dnslib>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<project.scm.id>github-server</project.scm.id>
