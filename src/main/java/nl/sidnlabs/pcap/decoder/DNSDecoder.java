@@ -22,8 +22,8 @@ package nl.sidnlabs.pcap.decoder;
 import java.util.List;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
-import nl.sidn.dnslib.message.Message;
-import nl.sidn.dnslib.message.util.NetworkData;
+import nl.sidnlabs.dnslib.message.Message;
+import nl.sidnlabs.dnslib.message.util.NetworkData;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 

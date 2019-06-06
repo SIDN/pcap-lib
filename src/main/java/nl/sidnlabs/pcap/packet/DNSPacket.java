@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import nl.sidn.dnslib.message.Message;
+import nl.sidnlabs.dnslib.message.Message;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
