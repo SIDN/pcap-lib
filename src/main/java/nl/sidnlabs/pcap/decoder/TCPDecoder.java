@@ -20,6 +20,8 @@
 package nl.sidnlabs.pcap.decoder;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import lombok.Data;
@@ -27,6 +29,7 @@ import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.SequencePayload;
+import nl.sidnlabs.pcap.decoder.TcpHandshake.HANDSHAKE_STATE;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.TCPFlow;
 
@@ -44,6 +47,8 @@ public class TCPDecoder {
 
   protected Multimap<TCPFlow, SequencePayload> flows = TreeMultimap.create();
   protected Multimap<TCPFlow, Long> flowseq = TreeMultimap.create();
+
+  protected Map<TCPFlow, TcpHandshake> handshakes = new HashMap<>();
 
   private int tcpPrefixError = 0;
 
@@ -124,7 +129,50 @@ public class TCPDecoder {
       return EMPTY_PAYLOAD;
     }
     // get the flow details for this packet
-    TCPFlow flow = (TCPFlow) packet.getFlow();
+    TCPFlow flow = packet.getFlow();
+    if (packet.isTcpFlagSyn() && !(packet.isTcpFlagSyn() && packet.isTcpFlagAck())) {
+      // this is a new TCP connection, create handshake and return
+      TcpHandshake handshake = new TcpHandshake();
+      handshake.setSynTs(packet.getTsMilli());
+      handshakes.put(flow, handshake);
+      return EMPTY_PAYLOAD;
+    }
+
+    if (packet.isTcpFlagSyn() && packet.isTcpFlagAck()) {
+      TCPFlow reverseFlow = packet.getReverseFlow();
+      TcpHandshake handshake = handshakes.get(reverseFlow);
+      if (handshake != null) {
+        // got syn/ack for the handshake
+        if (HANDSHAKE_STATE.SYN_RECV == handshake.getState()) {
+          handshake.setState(HANDSHAKE_STATE.SYN_ACK_SENT);
+        } else {
+          // illegal state
+          log
+              .error("Found TCP handshake but state is {} and should be {}", handshake.getState(),
+                  HANDSHAKE_STATE.SYN_RECV);
+          handshakes.remove(reverseFlow);
+        }
+      } else {
+        log.error("Cannot find handshake for SYN/ACK");
+      }
+      return EMPTY_PAYLOAD;
+    }
+
+    if (packet.isTcpFlagAck()) {
+      TcpHandshake handshake = handshakes.get(flow);
+      if (handshake != null && HANDSHAKE_STATE.SYN_ACK_SENT == handshake.getState()) {
+        // got final ack for the handshake, connection complete
+        handshake.setAckTs(packet.getTsMilli());
+        handshake.setState(HANDSHAKE_STATE.ACK_RECV);
+        return EMPTY_PAYLOAD;
+      }
+    }
+
+    TcpHandshake handshake = handshakes.remove(flow);
+    if (handshake != null && HANDSHAKE_STATE.ACK_RECV == handshake.getState()) {
+      // add handshake to the first packet after the handshake was completed
+      packet.setTcpHandshake(handshake);
+    }
 
     // keep all tcp data until we get a signal to push the data up the stack
     if (packetPayload.length > 0) {

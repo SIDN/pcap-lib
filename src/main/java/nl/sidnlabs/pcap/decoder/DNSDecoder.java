@@ -61,7 +61,6 @@ public class DNSDecoder {
     nd = new NetworkData(payload);
     try {
       dnsMessage = new Message(nd, allowFaill);
-      dnsMessage.setBytes(nd.length());
       packet.pushMessage(dnsMessage);
       messageCounter++;
     } catch (Exception e) {

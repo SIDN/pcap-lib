@@ -22,14 +22,14 @@ package nl.sidnlabs.pcap;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.apache.commons.codec.binary.Hex;
 import com.google.common.collect.Multimap;
 import lombok.extern.log4j.Log4j2;
@@ -50,7 +50,7 @@ import nl.sidnlabs.pcap.packet.TCPFlow;
  *
  */
 @Log4j2
-public class PcapReader implements Iterable<Packet> {
+public class PcapReader {
 
   // needs no explanation
   public static final int DNS_PORT = 53;
@@ -81,8 +81,6 @@ public class PcapReader implements Iterable<Packet> {
   private Iterator<Packet> iterator;
   private LinkType linkType;
   private boolean caughtEOF = false;
-  // MathContext for BigDecimal to preserve only 16 decimal digits
-  private MathContext matchCtx = new MathContext(16);
 
   // To read reversed-endian PCAPs; the header is the only part that switches
   private boolean reverseHeaderByteOrder = false;
@@ -97,7 +95,7 @@ public class PcapReader implements Iterable<Packet> {
   private TCPDecoder tcpDecoder = new TCPDecoder();
   private DNSDecoder dnsDecoder = new DNSDecoder();
 
-  public void init(DataInputStream is) throws IOException {
+  public PcapReader(DataInputStream is) throws IOException {
     this.is = is;
     iterator = new PacketIterator();
 
@@ -122,6 +120,11 @@ public class PcapReader implements Iterable<Packet> {
         PcapReaderUtil.convertInt(pcapHeader, PCAP_HEADER_LINKTYPE_OFFSET, reverseHeaderByteOrder);
     if ((linkType = getLinkType(linkTypeVal)) == null)
       throw new IOException("Unsupported link type: " + linkTypeVal);
+  }
+
+  public Stream<Packet> stream() {
+    Iterable<Packet> valueIterable = () -> iterator;
+    return StreamSupport.stream(valueIterable.spliterator(), false);
   }
 
   /**
@@ -212,17 +215,15 @@ public class PcapReader implements Iterable<Packet> {
     }
 
     // the pcap header for ervy packet contains a timestamp with the capture datetime of the packet
-    long packetTimestamp =
+    long packetTimestampSecs =
         PcapReaderUtil.convertInt(pcapPacketHeader, TIMESTAMP_OFFSET, reverseHeaderByteOrder);
-    packet.setTs(packetTimestamp);
+    packet.setTsSec(packetTimestampSecs);
     long packetTimestampMicros = PcapReaderUtil
         .convertInt(pcapPacketHeader, TIMESTAMP_MICROS_OFFSET, reverseHeaderByteOrder);
-    packet.setTsmicros(packetTimestampMicros);
+    packet.setTsMicro(packetTimestampMicros);
 
-    // Prepare the timestamp with a BigDecimal to include microseconds
-    BigDecimal packetTimestampUsec =
-        new BigDecimal(packetTimestamp + (double) packetTimestampMicros / 1000000.0, matchCtx);
-    packet.setTsUsec(packetTimestampUsec.doubleValue());
+    // calc the timestamp in milliseconds = seconds + micros combined
+    packet.setTsMilli((packetTimestampSecs * 1000) + (packetTimestampMicros / 1000));
 
     int ipProtocolHeaderVersion = packet.getIpVersion();
     if (ipProtocolHeaderVersion == 4 || ipProtocolHeaderVersion == 6) {
@@ -433,12 +434,6 @@ public class PcapReader implements Iterable<Packet> {
       return false;
     }
   }
-
-  @Override
-  public Iterator<Packet> iterator() {
-    return iterator;
-  }
-
 
   public Multimap<TCPFlow, SequencePayload> getFlows() {
     return tcpDecoder.getFlows();

@@ -21,6 +21,7 @@ package nl.sidnlabs.pcap.packet;
 
 import lombok.Data;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
+import nl.sidnlabs.pcap.decoder.TcpHandshake;
 
 /**
  * Packet contains a combination of IP layer and UDP/TCP/DNS layer data Fragmented IP is joined into
@@ -36,9 +37,12 @@ public class Packet {
 
   // network
   protected int len;
-  protected long ts;
-  protected long tsmicros;
-  protected double tsUsec;
+  // time in seconds
+  protected long tsSec;
+  // time in micros relative to tsSec (in secs)
+  protected long tsMicro;
+  // time in millis ( tsSec + tsmicros)
+  protected long tsMilli;
   // ip
   protected long ipId;
   protected int ttl;
@@ -80,9 +84,18 @@ public class Packet {
   private int totalLength;
   protected int payloadLength;
 
+  // if this is a tcp packet and a handshake has been completed
+  // then tcpHandshake will contain the timestamps
+  protected TcpHandshake tcpHandshake;
+
   public TCPFlow getFlow() {
     return new TCPFlow(src, srcPort, dst, dstPort, protocol);
   }
+
+  public TCPFlow getReverseFlow() {
+    return new TCPFlow(dst, dstPort, src, srcPort, protocol);
+  }
+
 
   public Datagram getDatagram() {
     return new Datagram(getSrc(), getDst(), getIpId(), String.valueOf(getProtocol()),
