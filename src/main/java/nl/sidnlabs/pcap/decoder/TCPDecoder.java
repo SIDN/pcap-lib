@@ -241,8 +241,8 @@ public class TCPDecoder implements PacketReader {
           // for rtt measurements
           handshakes.remove(reverseFlow);
         }
-      } else {
-        log.error("Cannot find handshake for SYN/ACK");
+      } else if (log.isDebugEnabled()) {
+        log.debug("Cannot find handshake for SYN/ACK, maybe a retry?");
       }
       return true;
     } else if (packet.isTcpFlagAck()) {
