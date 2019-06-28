@@ -19,13 +19,12 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
-import java.util.List;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.dnslib.message.Message;
 import nl.sidnlabs.dnslib.message.util.NetworkData;
-import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.packet.DNSPacket;
+import nl.sidnlabs.pcap.packet.Packet;
 
 /**
  * Decode the dns payload of an UDP or TCP message
@@ -38,45 +37,29 @@ public class DNSDecoder {
   private int dnsDecodeError;
   private int messageCounter;
 
-
-  public int decode(DNSPacket packet, List<byte[]> payloads) {
-    int counter = 0;
-    for (byte[] payload : payloads) {
-      decode(packet, payload);
-      counter++;
-    }
-    return counter;
+  public Packet decode(Packet packet, byte[] payload) {
+    return decode(packet, payload, false);
   }
 
+  public Packet decode(Packet packet, byte[] payload, boolean allowFaill) {
 
-  public void decode(DNSPacket packet, byte[] payload) {
-    decode(packet, payload, false);
-  }
-
-  public void decode(DNSPacket packet, byte[] payload, boolean allowFaill) {
-
+    DNSPacket dnsPacket = (DNSPacket) packet;
     NetworkData nd = null;
     Message dnsMessage = null;
 
     nd = new NetworkData(payload);
     try {
       dnsMessage = new Message(nd, allowFaill);
-      packet.pushMessage(dnsMessage);
+      dnsPacket.pushMessage(dnsMessage);
       messageCounter++;
     } catch (Exception e) {
       if (log.isDebugEnabled()) {
-        log.debug("error decoding maybe corrupt packet: " + packet, e);
+        log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
       }
       dnsDecodeError++;
     }
 
-    if (log.isDebugEnabled() && packet.getProtocol() == PcapReader.PROTOCOL_UDP
-        && nd.isBytesAvailable()) {
-      log
-          .debug("udp padding found for: " + packet.getSrc() + " " + packet.getSrcPort()
-              + " pad bytes: " + (nd.length() - nd.getReaderIndex()));
-    }
-
+    return dnsPacket;
   }
 
   public void reset() {

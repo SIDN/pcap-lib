@@ -1,4 +1,4 @@
-package nl.sidnlabs.pcap.decoder;
+package nl.sidnlabs.pcap.packet;
 
 import lombok.Data;
 
@@ -13,8 +13,14 @@ public class TcpHandshake {
   private long synTs;
   private long ackTs;
 
-  public TcpHandshake() {
+  private long clientSynSeq;
+  private long serverSynSeq;
+  private long serverAckSeq;
+  private long clientAckSeq;
+
+  public TcpHandshake(long clientSynSeq) {
     this.state = HANDSHAKE_STATE.SYN_RECV;
+    this.clientSynSeq = clientSynSeq;
   }
 
   public long rtt() {

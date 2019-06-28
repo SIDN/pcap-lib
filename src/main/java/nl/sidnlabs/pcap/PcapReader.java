@@ -20,28 +20,20 @@
 package nl.sidnlabs.pcap;
 
 import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.codec.binary.Hex;
 import com.google.common.collect.Multimap;
 import lombok.extern.log4j.Log4j2;
-import nl.sidnlabs.pcap.decoder.DNSDecoder;
 import nl.sidnlabs.pcap.decoder.ICMPDecoder;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 import nl.sidnlabs.pcap.decoder.TCPDecoder;
 import nl.sidnlabs.pcap.decoder.UDPDecoder;
-import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
-import nl.sidnlabs.pcap.packet.ICMPPacket;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.TCPFlow;
 
@@ -66,38 +58,27 @@ public class PcapReader {
   public static final int ETHERNET_TYPE_IP = 0x800;
   public static final int ETHERNET_TYPE_IPV6 = 0x86dd;
   public static final int ETHERNET_TYPE_8021Q = 0x8100;
-  public static final int ETHHERNET_MINIMUM_PYALOAD_SIZE = 46;
   public static final int SLL_HEADER_BASE_SIZE = 10; // SLL stands for Linux cooked-mode capture
   public static final int SLL_ADDRESS_LENGTH_OFFSET = 4; // relative to SLL header
   public static final int PROTOCOL_HEADER_SRC_PORT_OFFSET = 0;
   public static final int PROTOCOL_HEADER_DST_PORT_OFFSET = 2;
-  public static final int PROTOCOL_TCP = 6;
-  public static final int PROTOCOL_UDP = 17;
+
   public static final int PROTOCOL_FRAGMENTED = -1;
 
-  public static final int TCP_DNS_LENGTH_PREFIX = 2;
-
   private DataInputStream is;
-  private Iterator<Packet> iterator;
   private LinkType linkType;
-  private boolean caughtEOF = false;
 
   // To read reversed-endian PCAPs; the header is the only part that switches
   private boolean reverseHeaderByteOrder = false;
-  private int packetCounter;
 
   // metrics
-  private int dnsDecodeError = 0;
+  private int packetCounter;
 
-  private IPDecoder ipDecoder = new IPDecoder();
-  private ICMPDecoder icmpDecoder = new ICMPDecoder();
-  private UDPDecoder udpDecoder = new UDPDecoder();
   private TCPDecoder tcpDecoder = new TCPDecoder();
-  private DNSDecoder dnsDecoder = new DNSDecoder();
+  private IPDecoder ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
 
   public PcapReader(DataInputStream is) throws IOException {
     this.is = is;
-    iterator = new PacketIterator();
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
     if (!readBytes(pcapHeader)) {
@@ -106,10 +87,6 @@ public class PcapReader {
       // PcapReader to barf on an empty file. This is the only
       // place we check caughtEOF.
       //
-      if (caughtEOF) {
-        log.warn("Skipping empty file");
-        return;
-      }
       throw new IOException("Couldn't read PCAP header");
     }
 
@@ -123,53 +100,16 @@ public class PcapReader {
   }
 
   public Stream<Packet> stream() {
-    Iterable<Packet> valueIterable = () -> iterator;
+    Iterable<Packet> valueIterable = PacketIterator::new;
     return StreamSupport.stream(valueIterable.spliterator(), false);
   }
+
 
   /**
    * Clear expired cache entries in order to avoid memory problems
    */
   public void clearCache(int tcpFlowCacheTimeout, int fragmentedIPcacheTimeout) {
-    // clear tcp flows with expired packets
-    List<TCPFlow> expiredList = new ArrayList<>();
-    long now = System.currentTimeMillis();
-    Multimap<TCPFlow, SequencePayload> flows = tcpDecoder.getFlows();
-    for (TCPFlow flow : flows.keySet()) {
-      Collection<SequencePayload> payloads = flows.get(flow);
-      for (SequencePayload sequencePayload : payloads) {
-        if ((sequencePayload.getTime() + tcpFlowCacheTimeout) <= now) {
-          expiredList.add(flow);
-          break;
-        }
-      }
-    }
-
-    // check IP datagrams
-    List<Datagram> dgExpiredList = new ArrayList<>();
-
-    for (Datagram dg : ipDecoder.getDatagrams().keySet()) {
-      if ((dg.getTime() + fragmentedIPcacheTimeout) <= now) {
-        dgExpiredList.add(dg);
-      }
-    }
-
-    log.info("------------- Cache purge stats --------------");
-    log.info("TCP flow cache size: " + flows.size());
-    log.info("IP datagram cache size: " + ipDecoder.getDatagrams().size());
-    log.info("Expired (to be removed) TCP flows: " + expiredList.size());
-    log.info("Expired (to be removed) IP datagrams: " + dgExpiredList.size());
-    log.info("----------------------------------------------------");
-
-    // remove flows with expired packets
-    for (TCPFlow tcpFlow : expiredList) {
-      flows.removeAll(tcpFlow);
-    }
-
-    for (Datagram dg : dgExpiredList) {
-      ipDecoder.getDatagrams().removeAll(dg);
-    }
-
+    ipDecoder.clearCache(tcpFlowCacheTimeout, fragmentedIPcacheTimeout);
   }
 
   public void close() {
@@ -204,15 +144,9 @@ public class PcapReader {
       return Packet.NULL;
     }
 
-    // decode the ip layer
-    Packet packet = ipDecoder.decode(packetData, ipStart);
-    if (packet == Packet.NULL) {
-      if (log.isDebugEnabled()) {
-        log.debug(Hex.encodeHexString(packetData));
-      }
-      // decode failed
-      return packet;
-    }
+    // first create the packet so the timestamps can be added to the packet.
+    // these timestamps are needed by the protocol decoders.
+    Packet packet = ipDecoder.createPacket(packetData, ipStart);
 
     // the pcap header for ervy packet contains a timestamp with the capture datetime of the packet
     long packetTimestampSecs =
@@ -223,140 +157,17 @@ public class PcapReader {
     packet.setTsMicro(packetTimestampMicros);
 
     // calc the timestamp in milliseconds = seconds + micros combined
-    packet.setTsMilli((packetTimestampSecs * 1000) + (packetTimestampMicros / 1000));
+    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
 
-    int ipProtocolHeaderVersion = packet.getIpVersion();
-    if (ipProtocolHeaderVersion == 4 || ipProtocolHeaderVersion == 6) {
-      /*
-       * make sure there is no ethernet padding present. see: https://wiki.wireshark.org/Ethernet
-       */
-      if (packet.getTotalLength() < ETHHERNET_MINIMUM_PYALOAD_SIZE) { // 46
-        // padding present, copy all data except the padding, to avoid problems decoding tcp/udp/dns
-        packetData = Arrays.copyOfRange(packetData, 0, ipStart + packet.getTotalLength());
-      }
-      // check if the IP datagram is fragmented and needs to be reassembled
-      packetData = ipDecoder.reassemble(packet, packetData, ipStart);
-      // if decoder return empty byte array the IP packet is fragmented and is not the final
-      // fragment
-      if (packetData.length == 0) {
-        return Packet.NULL;
-      }
-      // create a list with all the byte arrays that need to be decoded as dns packets
-      List<byte[]> dnsBytes = new ArrayList<>();
-      if ((ICMPDecoder.PROTOCOL_ICMP_V4 == packet.getProtocol())
-          || (ICMPDecoder.PROTOCOL_ICMP_V6 == packet.getProtocol())) {
-        // found icmp protocol
-        ICMPPacket icmpPacket = (ICMPPacket) packet;
-        icmpDecoder.reassemble(icmpPacket, ipStart, packetData);
-        // do not process icmp packet further, because the dns packet might be corrupt (only 8 bytes
-        // in icmp packet)
-        packetCounter++;
-        return icmpPacket;
-      }
+    // decode the packet bytes
+    ipDecoder.decode(packet, packetData, ipStart);
 
-      if (PROTOCOL_TCP == packet.getProtocol()) {
-        // found TCP protocol
-        dnsBytes = handleTCP(packet, packetData, ipStart);
-      } else if (PROTOCOL_UDP == packet.getProtocol()) {
-        // found UDP protocol
-        dnsBytes = handleUDP(packet, packetData, ipStart);
-      }
-
-      if (!isDNS(packet)) {
-        // not a dns packet
-        if (log.isDebugEnabled()) {
-          log.debug("Packet is not a DNS packet: " + packet);
-        }
-        return Packet.NULL;
-      }
-
-      if (dnsBytes.isEmpty()) {
-        // no DNS packets found
-        if (log.isDebugEnabled()) {
-          log.debug("No valid DNS packet found: " + packet);
-        }
-        return Packet.NULL;
-      }
-
-      // only dns packets make it to here.
-      packetCounter++;
-      DNSPacket dnsPacket = (DNSPacket) packet;
-      try {
-        dnsDecoder.decode(dnsPacket, dnsBytes);
-      } catch (Exception e) {
-        /*
-         * catch anything which might get thrown out of the dns decoding if the tcp bytes are
-         * somehow incorrectly assembled the dns decoder will fail.
-         * 
-         * ignore the error and skip the packet.
-         */
-        if (log.isDebugEnabled()) {
-          log.debug("Packet payload could not be decoded (malformed packet?) details: " + packet);
-        }
-        dnsDecodeError++;
-      }
-
-      if (dnsPacket.getMessages() == null || dnsPacket.getMessageCount() == 0) {
-        // no dns message(s) found
-        return Packet.NULL;
-      }
+    if (packet == Packet.NULL && log.isDebugEnabled()) {
+      log.debug(Hex.encodeHexString(packetData));
     }
+
+    packetCounter++;
     return packet;
-  }
-
-
-  private boolean isDNS(Packet packet) {
-    return packet.getFragOffset() == 0 && (packet.getSrcPort() == PcapReader.DNS_PORT
-        || packet.getDstPort() == PcapReader.DNS_PORT);
-  }
-
-  private List<byte[]> handleUDP(Packet packet, byte[] packetData, int ipStart) {
-    List<byte[]> dnsBytes = new ArrayList<>();
-    byte[] tcpOrUdpPayload = udpDecoder
-        .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
-    if (tcpOrUdpPayload.length > 0) {
-      dnsBytes.add(tcpOrUdpPayload);
-    }
-    return dnsBytes;
-  }
-
-  private List<byte[]> handleTCP(Packet packet, byte[] packetData, int ipStart) {
-    List<byte[]> dnsBytes = new ArrayList<>();
-    byte[] tcpOrUdpPayload = tcpDecoder
-        .reassemble(packet, packet.getIpHeaderLen(), packetData.length, ipStart, packetData);
-    /*
-     * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
-     * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.
-     */
-    int tcpOrUdpPayloadIndex = 0;
-    while ((tcpOrUdpPayload.length > TCP_DNS_LENGTH_PREFIX)
-        && (tcpOrUdpPayloadIndex < tcpOrUdpPayload.length)) {
-      byte[] lenBytes = new byte[2];
-      System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, lenBytes, 0, 2);
-      int msgLen = PcapReaderUtil.convertShort(lenBytes);
-      // add the 2byte msg len
-      tcpOrUdpPayloadIndex += 2;
-      if ((tcpOrUdpPayloadIndex + msgLen) <= tcpOrUdpPayload.length) {
-        byte[] msgBytes = new byte[msgLen];
-        System.arraycopy(tcpOrUdpPayload, tcpOrUdpPayloadIndex, msgBytes, 0, msgLen);
-        dnsBytes.add(msgBytes);
-        // add the msg len to the index
-        tcpOrUdpPayloadIndex += msgLen;
-      } else {
-        // invalid msg len
-        if (log.isDebugEnabled()) {
-          log
-              .debug("Invalid TCP payload length, msgLen= " + msgLen + " tcpOrUdpPayload.length= "
-                  + tcpOrUdpPayload.length + " ack=" + packet.isTcpFlagAck());
-        }
-        break;
-      }
-    }
-    if (log.isDebugEnabled() && dnsBytes.size() > 1) {
-      log.debug("multiple msg in TCP stream");
-    }
-
-    return dnsBytes;
   }
 
   protected boolean validateMagicNumber(byte[] pcapHeader) {
@@ -425,10 +236,6 @@ public class PcapReader {
     try {
       is.readFully(buf);
       return true;
-    } catch (EOFException e) {
-      // Reached the end of the stream
-      caughtEOF = true;
-      return false;
     } catch (IOException e) {
       log.error("Error while reading " + buf.length + " bytes from buffer");
       return false;
@@ -473,7 +280,6 @@ public class PcapReader {
       if (remainingFlows > 0) {
         log.warn("Still " + remainingFlows + " flows queued. Missing packets to finish assembly?");
         log.warn("Packets processed: " + packetCounter);
-        log.warn("Messages decoded:  " + dnsDecoder.getMessageCounter());
       }
 
       return false;
@@ -502,10 +308,6 @@ public class PcapReader {
 
   public int getTcpPrefixError() {
     return tcpDecoder.getTcpPrefixError();
-  }
-
-  public int getDnsDecodeError() {
-    return dnsDecodeError;
   }
 
   public Multimap<Datagram, DatagramPayload> getDatagrams() {

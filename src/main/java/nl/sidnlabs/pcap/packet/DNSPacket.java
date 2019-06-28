@@ -35,24 +35,12 @@ public class DNSPacket extends Packet {
 
   /**
    * get dns message from packet
-   * 
+   *
    * @return first message in list, null if no message was found
    */
   public Message getMessage() {
     if (!messages.isEmpty()) {
       return messages.get(0);
-    }
-    return null;
-  }
-
-  /**
-   * remove dns message from packet
-   * 
-   * @return message that is removed, null if no message was found
-   */
-  public Message popMessage() {
-    if (!messages.isEmpty()) {
-      return messages.remove(0);
     }
     return null;
   }

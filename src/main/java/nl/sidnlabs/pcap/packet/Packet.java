@@ -21,7 +21,6 @@ package nl.sidnlabs.pcap.packet;
 
 import lombok.Data;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
-import nl.sidnlabs.pcap.decoder.TcpHandshake;
 
 /**
  * Packet contains a combination of IP layer and UDP/TCP/DNS layer data Fragmented IP is joined into
@@ -46,7 +45,7 @@ public class Packet {
   // ip
   protected long ipId;
   protected int ttl;
-  protected byte ipVersion;
+  protected int ipVersion;
   protected int ipHeaderLen;
   protected short protocol;
   protected String src;

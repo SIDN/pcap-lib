@@ -19,22 +19,24 @@
  */
 package nl.sidnlabs.pcap.packet;
 
-import nl.sidnlabs.pcap.PcapReader;
-import nl.sidnlabs.pcap.decoder.ICMPDecoder;
-
 /**
  * Create a packet object based on the protocol number.
  *
  */
 public class PacketFactory {
 
+  public static final int PROTOCOL_TCP = 6;
+  public static final int PROTOCOL_UDP = 17;
+  public static final int PROTOCOL_ICMP_V4 = 1;
+  public static final int PROTOCOL_ICMP_V6 = 58;
+
   private PacketFactory() {}
 
   public static Packet create(int protocol) {
     Packet p = null;
-    if ((protocol == ICMPDecoder.PROTOCOL_ICMP_V4) || (protocol == ICMPDecoder.PROTOCOL_ICMP_V6)) {
+    if ((protocol == PROTOCOL_ICMP_V4) || (protocol == PROTOCOL_ICMP_V6)) {
       p = new ICMPPacket();
-    } else if ((protocol == PcapReader.PROTOCOL_UDP) || (protocol == PcapReader.PROTOCOL_TCP)) {
+    } else if ((protocol == PROTOCOL_UDP) || (protocol == PROTOCOL_TCP)) {
       p = new DNSPacket();
     } else {
       return Packet.NULL;
