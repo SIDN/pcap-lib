@@ -38,20 +38,12 @@ public class DNSDecoder {
   private int messageCounter;
 
   public Packet decode(Packet packet, byte[] payload) {
-    return decode(packet, payload, false);
-  }
-
-  public Packet decode(Packet packet, byte[] payload, boolean allowFaill) {
 
     DNSPacket dnsPacket = (DNSPacket) packet;
-    NetworkData nd = null;
-    Message dnsMessage = null;
-
-    nd = new NetworkData(payload);
     try {
-      dnsMessage = new Message(nd, allowFaill);
-      dnsPacket.pushMessage(dnsMessage);
+      dnsPacket.pushMessage(new Message(new NetworkData(payload)));
       messageCounter++;
+      return dnsPacket;
     } catch (Exception e) {
       if (log.isDebugEnabled()) {
         log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
@@ -59,7 +51,7 @@ public class DNSDecoder {
       dnsDecodeError++;
     }
 
-    return dnsPacket;
+    return Packet.NULL;
   }
 
   public void reset() {

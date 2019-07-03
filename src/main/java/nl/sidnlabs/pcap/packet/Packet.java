@@ -40,7 +40,7 @@ public class Packet {
   protected long tsSec;
   // time in micros relative to tsSec (in secs)
   protected long tsMicro;
-  // time in millis ( tsSec + tsmicros)
+  // time in millis when packet was sent ( tsSec + tsmicros)
   protected long tsMilli;
   // ip
   protected long ipId;
@@ -64,7 +64,6 @@ public class Packet {
   protected int tcpflow;
   // udp
   protected int udpsum;
-  protected int udpLength;
   // tcp
   protected int tcpHeaderLen;
   protected long tcpSeq;
@@ -86,13 +85,37 @@ public class Packet {
   // if this is a tcp packet and a handshake has been completed
   // then tcpHandshake will contain the timestamps
   protected TcpHandshake tcpHandshake;
+  // time in millis between time packet was sent by server
+  // and when ack for packet was received in case of TCP use( tsSec + tsmicros)
+  protected long tcpPacketRtt = -1;
+  private boolean tcpRetransmission;
 
+  private TCPFlow flow;
+  private TCPFlow reverseFlow;
+
+
+  /**
+   * Get FLOW from Client to Server
+   * 
+   * @return TCPFlow
+   */
   public TCPFlow getFlow() {
-    return new TCPFlow(src, srcPort, dst, dstPort, protocol);
+    if (flow == null) {
+      flow = new TCPFlow(src, srcPort, dst, dstPort, protocol);
+    }
+    return flow;
   }
 
+  /**
+   * Get FLOW from Server to Client
+   * 
+   * @return TCPFlow
+   */
   public TCPFlow getReverseFlow() {
-    return new TCPFlow(dst, dstPort, src, srcPort, protocol);
+    if (reverseFlow == null) {
+      reverseFlow = new TCPFlow(dst, dstPort, src, srcPort, protocol);
+    }
+    return reverseFlow;
   }
 
 
@@ -109,4 +132,9 @@ public class Packet {
   public boolean isIPv6() {
     return getIpVersion() == IPDecoder.IP_PROTOCOL_VERSION_6;
   }
+
+  public boolean hasPacketRtt() {
+    return tcpPacketRtt != -1;
+  }
+
 }

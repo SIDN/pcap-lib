@@ -41,15 +41,12 @@ public class UDPDecoder implements PacketReader {
   /**
    * Decode the udp packet, supports reassembly of fragmented packets
    * 
-   * @param packet
-   * @param packetData
+   * @param packet the packet to reassemble
+   * @param packetData bytes to decode
    * @return payload bytes or null if not a valid packet
    */
   @Override
   public Packet reassemble(Packet packet, byte[] packetData, int offset) {
-
-    // if the offset == 0 then the payload contains the udp header, do not read the header, only get
-    // the udp payload bytes
 
     packet
         .setSrcPort(PcapReaderUtil
@@ -67,13 +64,10 @@ public class UDPDecoder implements PacketReader {
       }
     }
 
-    // int payloadDataStart = offset + packet.getIpHeaderLen() + UDPUtil.UDP_HEADER_SIZE;
-    // int payloadLength = packetData.length - packet.getIpHeaderLen() - UDPUtil.UDP_HEADER_SIZE;
     byte[] packetPayload = decode(packet, packetData, offset);
-    // PcapReaderUtil.readPayload(packetData, payloadDataStart, payloadLength);
 
     // total length of packet, might be wrong if icmp truncation is in play
-    packet.setUdpLength(packetData.length);
+    packet.setLen(packetData.length);
     packet.setPayloadLength(UDPUtil.getUdpLen(packetData, offset, packet.getIpHeaderLen()));
 
 
@@ -99,22 +93,7 @@ public class UDPDecoder implements PacketReader {
       return Packet.NULL;
     }
 
-
-    DNSPacket dnsPacket = (DNSPacket) packet;
-    try {
-      return dnsDecoder.decode(dnsPacket, packetPayload);
-    } catch (Exception e) {
-      /*
-       * catch anything which might get thrown out of the dns decoding if the tcp bytes are somehow
-       * incorrectly assembled the dns decoder will fail.
-       * 
-       * ignore the error and skip the packet.
-       */
-      if (log.isDebugEnabled()) {
-        log.debug("Packet payload could not be decoded (malformed packet?) details: " + packet);
-      }
-    }
-    return Packet.NULL;
+    return dnsDecoder.decode((DNSPacket) packet, packetPayload);
   }
 
   public byte[] decode(Packet packet, byte[] packetData, int offset) {

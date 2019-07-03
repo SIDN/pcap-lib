@@ -108,8 +108,9 @@ public class PcapReaderUtil {
    * Reads the packet payload and returns it as byte[]. If the payload could not be read an empty
    * byte[] is returned.
    * 
-   * @param packetData
-   * @param payloadDataStart
+   * @param packetData data to read from
+   * @param payloadDataStart start of data
+   * @param payloadLength bytes to read
    * @return payload as byte[]
    */
   public static byte[] readPayload(byte[] packetData, int payloadDataStart, int payloadLength) {
@@ -118,8 +119,9 @@ public class PcapReaderUtil {
       return new byte[0];
     }
     if (payloadDataStart > packetData.length) {
-      log.warn("Payload start (" + payloadDataStart + ") is larger than packet data ("
-          + packetData.length + "). Returning empty payload.");
+      log
+          .warn("Payload start (" + payloadDataStart + ") is larger than packet data ("
+              + packetData.length + "). Returning empty payload.");
       return new byte[0];
     }
     if (payloadDataStart + payloadLength > packetData.length) {

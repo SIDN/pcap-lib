@@ -78,6 +78,7 @@ public class PcapReader {
   private IPDecoder ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
 
   public PcapReader(DataInputStream is) throws IOException {
+    log.info("Create new PCAP reader");
     this.is = is;
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
@@ -107,6 +108,9 @@ public class PcapReader {
 
   /**
    * Clear expired cache entries in order to avoid memory problems
+   * 
+   * @param tcpFlowCacheTimeout timeout for tcp flows
+   * @param fragmentedIPcacheTimeout timeout for IP fragments
    */
   public void clearCache(int tcpFlowCacheTimeout, int fragmentedIPcacheTimeout) {
     ipDecoder.clearCache(tcpFlowCacheTimeout, fragmentedIPcacheTimeout);
@@ -116,7 +120,7 @@ public class PcapReader {
     try {
       is.close();
     } catch (IOException e) {
-      log.error("Error closing inputstream", e);
+      log.error("Error closing PCAP data inputstream", e);
     }
   }
 
@@ -160,14 +164,17 @@ public class PcapReader {
     packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
 
     // decode the packet bytes
-    ipDecoder.decode(packet, packetData, ipStart);
+    // the "packet" param is handed to the decode method as a parameter and
+    // will be updated with decoded values, DO NOT use this param anymore
+    // after calling IpDecoder::decode use the method result
+    Packet decodedPacket = ipDecoder.decode(packet, packetData, ipStart);
 
-    if (packet == Packet.NULL && log.isDebugEnabled()) {
+    if (decodedPacket == Packet.NULL && log.isDebugEnabled()) {
       log.debug(Hex.encodeHexString(packetData));
     }
 
     packetCounter++;
-    return packet;
+    return decodedPacket;
   }
 
   protected boolean validateMagicNumber(byte[] pcapHeader) {
@@ -304,10 +311,6 @@ public class PcapReader {
     public void remove() {
       // Not supported
     }
-  }
-
-  public int getTcpPrefixError() {
-    return tcpDecoder.getTcpPrefixError();
   }
 
   public Multimap<Datagram, DatagramPayload> getDatagrams() {

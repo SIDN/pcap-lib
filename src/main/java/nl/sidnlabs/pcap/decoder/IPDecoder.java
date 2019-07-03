@@ -282,6 +282,9 @@ public class IPDecoder {
 
   /**
    * Clear expired cache entries in order to avoid memory problems
+   * 
+   * @param tcpFlowCacheTimeout timeout for tcp flows
+   * @param fragmentedIPcacheTimeout timeout for IP fragments
    */
   public void clearCache(int tcpFlowCacheTimeout, int fragmentedIPcacheTimeout) {
     // clear tcp flows with expired packets

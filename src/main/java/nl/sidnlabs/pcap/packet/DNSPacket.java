@@ -21,11 +21,11 @@ package nl.sidnlabs.pcap.packet;
 
 import java.util.ArrayList;
 import java.util.List;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import nl.sidnlabs.dnslib.message.Message;
 
-@Data
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class DNSPacket extends Packet {
 
@@ -51,5 +51,9 @@ public class DNSPacket extends Packet {
 
   public int getMessageCount() {
     return messages.size();
+  }
+
+  public void clear() {
+    messages.clear();
   }
 }

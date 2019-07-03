@@ -39,21 +39,23 @@ import nl.sidnlabs.pcap.packet.TcpHandshake.HANDSHAKE_STATE;
 @Log4j2
 public class TCPDecoder implements PacketReader {
 
-  public static final int PROTOCOL_HEADER_TCP_SEQ_OFFSET = 4;
-  public static final int PROTOCOL_HEADER_TCP_ACK_OFFSET = 8;
-  public static final int TCP_HEADER_DATA_OFFSET = 12;
-  public static final int PROTOCOL_HEADER_WINDOW_SIZE_OFFSET = 14;
+  private static final int PROTOCOL_HEADER_TCP_SEQ_OFFSET = 4;
+  private static final int PROTOCOL_HEADER_TCP_ACK_OFFSET = 8;
+  private static final int TCP_HEADER_DATA_OFFSET = 12;
+  private static final int PROTOCOL_HEADER_WINDOW_SIZE_OFFSET = 14;
 
-  public static final int TCP_DNS_LENGTH_PREFIX = 2;
+  private static final int TCP_DNS_LENGTH_PREFIX = 2;
 
   private DNSDecoder dnsDecoder = new DNSDecoder();
 
-  protected Multimap<TCPFlow, SequencePayload> flows = TreeMultimap.create();
-  protected Multimap<TCPFlow, Long> flowseq = TreeMultimap.create();
+  private Multimap<TCPFlow, SequencePayload> flows = TreeMultimap.create();
+  private Multimap<TCPFlow, Long> flowseq = TreeMultimap.create();
+  private Map<TCPFlow, TcpHandshake> handshakes = new HashMap<>();
+  // keep reassembled packets until a ack is received and the ack time can be added to the packet
+  private Map<TCPFlow, Packet> reassembledPackets = new HashMap<>();
 
-  protected Map<TCPFlow, TcpHandshake> handshakes = new HashMap<>();
-
-  private int tcpPrefixError = 0;
+  private int reqPacketCounter = 0;
+  private int rspPacketCounter = 0;
 
 
   public byte[] decode(Packet packet, byte[] packetData, int offset) {
@@ -112,19 +114,18 @@ public class TCPDecoder implements PacketReader {
 
     packet.setPayloadLength(payloadLength);
     // total length of packet
-    packet.setUdpLength(packetData.length);
+    packet.setLen(packetData.length);
+
     return data;
   }
 
   /**
    * decode the packetdata
    * 
-   * @param packet
-   * @param ipHeaderLen
-   * @param totalLength
-   * @param ipStart
-   * @param packetData
-   * @return payload bytes or null if not a valid packet
+   * @param packet network packet
+   * @param packetData data to assemble
+   * @param offset start of data in packetData
+   * @return reassembled packet of NULL packet
    */
   public Packet reassemble(Packet packet, byte[] packetData, int offset) {
     byte[] packetPayload = decode(packet, packetData, offset);
@@ -136,29 +137,69 @@ public class TCPDecoder implements PacketReader {
 
     if (packet.isTcpFlagRst()) {
       // reset flag is set, connection should be reset, clear all state
+      if (log.isDebugEnabled()) {
+        log.debug("Connection RESET for: {}", packet);
+      }
       TCPFlow flow = packet.getFlow();
       handshakes.remove(flow);
       flows.removeAll(flow);
+      reassembledPackets.remove(flow);
       return Packet.NULL;
     }
 
     // get the flow details for this packet
     TCPFlow flow = packet.getFlow();
+    boolean isServer = packet.getSrcPort() == PcapReader.DNS_PORT;
+    boolean hasPayload = packetPayload.length > 0;
 
-    if (checkForHandshake(packet, flow)) {
-      // packet is part of handshake, do not process payload
+    if (handshake(packet, isServer)) {
+      // packet is part of handshake, do not continue because
+      // there is no payload data
       return Packet.NULL;
     }
 
     // normal post-handshake processing starts here
+    if (isServer && packet.isTcpFlagAck() && hasPayload) {
+      Packet reassembledPacket = reassembledPackets.get(packet.getReverseFlow());
+      if (reassembledPacket != null && reassembledPacket.getTcpSeq() == packet.getTcpSeq()) {
+        // detected a retransmission of a server response
+        // ignore this packet and mark previous as retransmission in progress
+        reassembledPacket.setTcpRetransmission(true);
+        if (log.isDebugEnabled()) {
+          log.debug("DUP: {}", packet);
+        }
+        return Packet.NULL;
+      }
+    }
+
     // save all tcp payload data until we get a signal to push the data up the stack
-    if (packetPayload.length > 0) {
+    if (hasPayload) {
       SequencePayload sequencePayload =
           new SequencePayload(packet.getTcpSeq(), packetPayload, System.currentTimeMillis());
       flows.put(flow, sequencePayload);
     }
 
+    // check if this is a ack for the server response
+    if (!isServer && packet.isTcpFlagAck()) {
+      // get resassembledPacket packet using client flow
+      Packet resassembledPacket = reassembledPackets.remove(packet.getFlow());
+      if (resassembledPacket != null) {
+        // found a resassembledPacket packet waiting to be returned, use the
+        // timestamp from the current ack packet for RTT calculation
+        // Only do this when NO RETRANSMISSIONS have been detected
+        // because we cannot now which packet the client will ack the original packet or any of the
+        // retransmissions. See: https://en.wikipedia.org/wiki/Karn%27s_algorithm
+        if (!resassembledPacket.isTcpRetransmission()) {
+          resassembledPacket.setTcpPacketRtt(packet.getTsMilli() - resassembledPacket.getTsMilli());
+        }
+        return resassembledPacket;
+      }
+    }
+
+    // check if this is a end of session (fin) or signal to push data to the
+    // application (psh)
     if (packet.isTcpFlagFin() || packet.isTcpFlagPsh()) {
+
       // received signal to push the data received for this flow up the stack.
       Collection<SequencePayload> fragments = flows.removeAll(flow);
       if (fragments != null && !fragments.isEmpty()) {
@@ -181,7 +222,6 @@ public class TCPDecoder implements PacketReader {
                     + " has Broken sequence chain between " + seqPayload + " and " + prev
                     + ". Returning empty payload.");
             packetPayload = new byte[0];
-            tcpPrefixError++;
             // got chain linkage error, ignore all data, return nothing. (these bytes cannot be
             // decoded)
             break;
@@ -203,11 +243,25 @@ public class TCPDecoder implements PacketReader {
           // HANDSHAKE_STATE.ACK_RECV
           packet.setTcpHandshake(handshake);
         }
-        return handleDNS(packet, packetPayload);
+
+        // if packet is server response then keep it in reassembledPackets map until we get a
+        // ack from the client, we need the timestamp from the client ack for the RTT calculation
+        if (isServer) {
+          Packet decodedDnsPacket = decodeDnsPayload(packet, packetPayload);
+          if (decodedDnsPacket != Packet.NULL) {
+            rspPacketCounter++;
+            // use the reverse flow to save the packet in reassembledPackets
+            // so we can find it again using the the flow of the client.
+            reassembledPackets.put(decodedDnsPacket.getReverseFlow(), decodedDnsPacket);
+          }
+        } else {
+          reqPacketCounter++;
+          return decodeDnsPayload(packet, packetPayload);
+        }
       }
     }
 
-    // no fin or push flag signal detected, do not return any bytes yet to upper protocol decoder.
+    // do not return any bytes yet to upper protocol decoder.
     return Packet.NULL;
   }
 
@@ -217,14 +271,17 @@ public class TCPDecoder implements PacketReader {
    * @param flow
    * @return true when handshake packet is detected and payload processing should not continue
    */
-  private boolean checkForHandshake(Packet packet, TCPFlow flow) {
-    if (packet.isTcpFlagSyn() && !packet.isTcpFlagAck()) {
+  private boolean handshake(Packet packet, boolean server) {
+    // check if client sent syn
+    if (!server && packet.isTcpFlagSyn() && !packet.isTcpFlagAck()) {
       // this is a client syn for a new TCP connection, create handshake and return
       TcpHandshake handshake = new TcpHandshake(packet.getTcpSeq());
       handshake.setSynTs(packet.getTsMilli());
-      handshakes.put(flow, handshake);
+      handshakes.put(packet.getFlow(), handshake);
       return true;
-    } else if (packet.isTcpFlagSyn() && packet.isTcpFlagAck()) {
+    }
+    // check if server sent syn/ack
+    else if (server && packet.isTcpFlagSyn() && packet.isTcpFlagAck()) {
       // this is a server syn/ack, lookup the flow by reversing the src/dst
       TCPFlow reverseFlow = packet.getReverseFlow();
       TcpHandshake handshake = handshakes.get(reverseFlow);
@@ -237,7 +294,7 @@ public class TCPDecoder implements PacketReader {
           handshake.setServerSynSeq(packet.getTcpSeq());
         } else {
           // incorrect state, maybe retransmission, ignore this handshake.
-          // retransmission in the handshake can give incorrent results
+          // retransmission in the handshake can give incorrect results
           // for rtt measurements
           handshakes.remove(reverseFlow);
         }
@@ -245,9 +302,14 @@ public class TCPDecoder implements PacketReader {
         log.debug("Cannot find handshake for SYN/ACK, maybe a retry?");
       }
       return true;
-    } else if (packet.isTcpFlagAck()) {
+    }
+    // check if client sent ack to complete the handshake
+    else if (!server && packet.isTcpFlagAck()) {
       // this could be the final client ack for the handshake
-      TcpHandshake handshake = handshakes.get(flow);
+      // or in the case of tcp fast open it can also be the svr reply
+      // containing the fast open cookie. ignore fast open handshakes cannot measure
+      // rtt for these, see https://tools.ietf.org/html/rfc7413
+      TcpHandshake handshake = handshakes.get(packet.getFlow());
       if (handshake != null && HANDSHAKE_STATE.SYN_ACK_SENT == handshake.getState()
           && packet.getTcpAck() - 1 == handshake.getServerSynSeq()) {
         // state and seq number match, got final ack for the handshake, connection complete
@@ -274,7 +336,7 @@ public class TCPDecoder implements PacketReader {
     return -1;
   }
 
-  private Packet handleDNS(Packet packet, byte[] payload) {
+  private Packet decodeDnsPayload(Packet packet, byte[] payload) {
     /*
      * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
      * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.
@@ -289,7 +351,7 @@ public class TCPDecoder implements PacketReader {
       if ((payloadIndex + msgLen) <= payload.length) {
         byte[] msgBytes = new byte[msgLen];
         System.arraycopy(payload, payloadIndex, msgBytes, 0, msgLen);
-        createDnsPacket(packet, msgBytes);
+        packet = dnsDecoder.decode((DNSPacket) packet, msgBytes);
         // add the msg len to the index
         payloadIndex += msgLen;
       } else {
@@ -307,25 +369,6 @@ public class TCPDecoder implements PacketReader {
     }
 
     return packet;
-  }
-
-  private Packet createDnsPacket(Packet packet, byte[] packetPayload) {
-
-    DNSPacket dnsPacket = (DNSPacket) packet;
-    try {
-      return dnsDecoder.decode(dnsPacket, packetPayload);
-    } catch (Exception e) {
-      /*
-       * catch anything which might get thrown out of the dns decoding if the tcp bytes are somehow
-       * incorrectly assembled the dns decoder will fail.
-       * 
-       * ignore the error and skip the packet.
-       */
-      if (log.isDebugEnabled()) {
-        log.debug("Packet payload could not be decoded (malformed packet?) details: " + packet);
-      }
-    }
-    return Packet.NULL;
   }
 
 }
