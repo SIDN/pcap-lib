@@ -183,13 +183,15 @@ public class TCPDecoder implements PacketReader {
     if (!isServer && packet.isTcpFlagAck()) {
       // get resassembledPacket packet using client flow
       Packet resassembledPacket = reassembledPackets.remove(packet.getFlow());
+      // check if the client ack is for the correct server response.
       if (resassembledPacket != null) {
         // found a resassembledPacket packet waiting to be returned, use the
         // timestamp from the current ack packet for RTT calculation
         // Only do this when NO RETRANSMISSIONS have been detected
         // because we cannot now which packet the client will ack the original packet or any of the
         // retransmissions. See: https://en.wikipedia.org/wiki/Karn%27s_algorithm
-        if (!resassembledPacket.isTcpRetransmission()) {
+        if (!resassembledPacket.isTcpRetransmission()
+            && resassembledPacket.nextAck() == packet.getTcpAck()) {
           resassembledPacket.setTcpPacketRtt(packet.getTsMilli() - resassembledPacket.getTsMilli());
         }
         return resassembledPacket;
@@ -337,6 +339,7 @@ public class TCPDecoder implements PacketReader {
   }
 
   private Packet decodeDnsPayload(Packet packet, byte[] payload) {
+
     /*
      * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
      * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.

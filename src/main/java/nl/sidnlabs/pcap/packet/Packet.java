@@ -137,4 +137,13 @@ public class Packet {
     return tcpPacketRtt != -1;
   }
 
+  /**
+   * Calculate next sequence number
+   * 
+   * @return sequencenumber expected in the next ack for this packet
+   */
+  public long nextAck() {
+    return tcpSeq + payloadLength;
+  }
+
 }

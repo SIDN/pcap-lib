@@ -43,7 +43,6 @@ public class DNSDecoder {
     try {
       dnsPacket.pushMessage(new Message(new NetworkData(payload)));
       messageCounter++;
-      return dnsPacket;
     } catch (Exception e) {
       if (log.isDebugEnabled()) {
         log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
@@ -51,7 +50,7 @@ public class DNSDecoder {
       dnsDecodeError++;
     }
 
-    return Packet.NULL;
+    return packet;
   }
 
   public void reset() {
