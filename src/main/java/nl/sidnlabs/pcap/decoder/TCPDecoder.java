@@ -192,7 +192,8 @@ public class TCPDecoder implements PacketReader {
         // retransmissions. See: https://en.wikipedia.org/wiki/Karn%27s_algorithm
         if (!resassembledPacket.isTcpRetransmission()
             && resassembledPacket.nextAck() == packet.getTcpAck()) {
-          resassembledPacket.setTcpPacketRtt(packet.getTsMilli() - resassembledPacket.getTsMilli());
+          resassembledPacket
+              .setTcpPacketRtt((int) (packet.getTsMilli() - resassembledPacket.getTsMilli()));
         }
         return resassembledPacket;
       }

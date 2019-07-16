@@ -23,7 +23,7 @@ public class TcpHandshake {
     this.clientSynSeq = clientSynSeq;
   }
 
-  public long rtt() {
-    return ackTs - synTs;
+  public int rtt() {
+    return (int) (ackTs - synTs);
   }
 }
