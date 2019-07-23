@@ -352,7 +352,7 @@ public class TCPDecoder implements PacketReader {
       int msgLen = PcapReaderUtil.convertShort(lenBytes);
       // add the 2byte msg len
       payloadIndex += 2;
-      if ((payloadIndex + msgLen) <= payload.length) {
+      if (msgLen > 0 && (payloadIndex + msgLen) <= payload.length) {
         byte[] msgBytes = new byte[msgLen];
         System.arraycopy(payload, payloadIndex, msgBytes, 0, msgLen);
         packet = dnsDecoder.decode((DNSPacket) packet, msgBytes);
