@@ -191,6 +191,11 @@ public class TCPDecoder implements PacketReader {
 
       fd = flows.get(flow);
       if (fd == null) {
+        if (packetPayload.length < TCP_DNS_LENGTH_PREFIX) {
+          // first packet did not have enough data (2-bytes) for the dns message length prefix
+          // probably malformed packet, ignore packet
+          return Packet.NULL;
+        }
         // this is the 1st segment for this flow, create new FlowData
         fd = new FlowData();
         flows.put(flow, fd);
@@ -206,13 +211,6 @@ public class TCPDecoder implements PacketReader {
         // this is the first part of the tcp flow, set the
         // - size of the next dns message
         // - total bytes available (sum of all received sequences) for current flow
-
-        if (packetPayload.length < TCP_DNS_LENGTH_PREFIX) {
-          // first packet did not have enough data (2-bytes) for the dns message length prefix
-          // probably malformed packet, ignore packet
-          flows.remove(flow);
-          return Packet.NULL;
-        }
         fd.setNextDnsMsgLen(dnsMessageLen(packetPayload, 0));
         fd.setBytesAvail(packetPayload.length);
       } else {
@@ -372,7 +370,6 @@ public class TCPDecoder implements PacketReader {
     // ordering is ok, all sequences are linked
 
     return seqPayloads;
-
   }
 
   private boolean isNextPayloadAvail(FlowData fd) {
@@ -380,8 +377,8 @@ public class TCPDecoder implements PacketReader {
   }
 
   /**
-   * Create a new flow and linked dataflow entry in the flows map, using the leftover bytes. these
-   * are the bytes that can not yet be decoded because more data is required.
+   * Add a new flowdata obj to the flows map, using the leftover bytes. these are the bytes that can
+   * not yet be decoded because more data is required.
    * 
    * @param flow current flow
    * @param remainder the leftover bytes
