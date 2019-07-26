@@ -19,13 +19,14 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
-import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.TreeMultimap;
+import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import nl.sidnlabs.pcap.FlowData;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.SequencePayload;
@@ -46,16 +47,23 @@ public class TCPDecoder implements PacketReader {
 
   private static final int TCP_DNS_LENGTH_PREFIX = 2;
 
-  private DNSDecoder dnsDecoder = new DNSDecoder();
+  private DNSDecoder dnsDecoder;
 
-  private Multimap<TCPFlow, SequencePayload> flows = TreeMultimap.create();
-  private Multimap<TCPFlow, Long> flowseq = TreeMultimap.create();
+  private Map<TCPFlow, FlowData> flows = new HashMap<>();
   private Map<TCPFlow, TcpHandshake> handshakes = new HashMap<>();
   // keep reassembled packets until a ack is received and the ack time can be added to the packet
   private Map<TCPFlow, Packet> reassembledPackets = new HashMap<>();
 
   private int reqPacketCounter = 0;
   private int rspPacketCounter = 0;
+
+  public TCPDecoder() {
+    this(false);
+  }
+
+  public TCPDecoder(boolean allowfail) {
+    dnsDecoder = new DNSDecoder(allowfail);
+  }
 
 
   public byte[] decode(Packet packet, byte[] packetData, int offset) {
@@ -138,11 +146,11 @@ public class TCPDecoder implements PacketReader {
     if (packet.isTcpFlagRst()) {
       // reset flag is set, connection should be reset, clear all state
       if (log.isDebugEnabled()) {
-        log.debug("Connection RESET for: {}", packet);
+        log.debug("Connection RESET for src: {} dst: {}", packet.getSrc(), packet.getDst());
       }
       TCPFlow flow = packet.getFlow();
       handshakes.remove(flow);
-      flows.removeAll(flow);
+      flows.remove(flow);
       reassembledPackets.remove(flow);
       return Packet.NULL;
     }
@@ -166,17 +174,50 @@ public class TCPDecoder implements PacketReader {
         // ignore this packet and mark previous as retransmission in progress
         reassembledPacket.setTcpRetransmission(true);
         if (log.isDebugEnabled()) {
-          log.debug("DUP: {}", packet);
+          log
+              .debug("Ignoring duplicate packet for src: {} dst: {}", packet.getSrc(),
+                  packet.getDst());
         }
         return Packet.NULL;
       }
     }
 
+    // FlowData is used to keep a list of all data-segments (sequences) linked to the current flow
+    FlowData fd = null;
     // save all tcp payload data until we get a signal to push the data up the stack
     if (hasPayload) {
       SequencePayload sequencePayload =
-          new SequencePayload(packet.getTcpSeq(), packetPayload, System.currentTimeMillis());
-      flows.put(flow, sequencePayload);
+          new SequencePayload(packet.getTcpSeq(), packetPayload, System.currentTimeMillis(), flow);
+
+      fd = flows.get(flow);
+      if (fd == null) {
+        // this is the 1st segment for this flow, create new FlowData
+        fd = new FlowData();
+        flows.put(flow, fd);
+      }
+
+      // add the segment/sequence to flowdata
+      if (!fd.addPayload(sequencePayload)) {
+        // could not add the sequence to flow, do not continue
+        return Packet.NULL;
+      }
+
+      if (fd.size() == 1) {
+        // this is the first part of the tcp flow, set the
+        // - size of the next dns message
+        // - total bytes available (sum of all received sequences) for current flow
+
+        if (packetPayload.length < TCP_DNS_LENGTH_PREFIX) {
+          // first packet did not have enough data (2-bytes) for the dns message length prefix
+          // probably malformed packet, ignore packet
+          flows.remove(flow);
+          return Packet.NULL;
+        }
+        fd.setNextDnsMsgLen(dnsMessageLen(packetPayload, 0));
+        fd.setBytesAvail(packetPayload.length);
+      } else {
+        fd.setBytesAvail(fd.getBytesAvail() + packetPayload.length);
+      }
     }
 
     // check if this is a ack for the server response
@@ -199,42 +240,53 @@ public class TCPDecoder implements PacketReader {
       }
     }
 
+    if (packet.isTcpFlagFin() && !isNextPayloadAvail(fd)) {
+      // got end of tcp stream but not enough data to decode dns packet.
+      // ignore the leftover data
+      flows.remove(flow);
+      return Packet.NULL;
+    }
+
     // check if this is a end of session (fin) or signal to push data to the
     // application (psh)
-    if (packet.isTcpFlagFin() || packet.isTcpFlagPsh()) {
+    if (packet.isTcpFlagFin() || packet.isTcpFlagPsh() || isNextPayloadAvail(fd)) {
 
-      // received signal to push the data received for this flow up the stack.
-      Collection<SequencePayload> fragments = flows.removeAll(flow);
-      if (fragments != null && !fragments.isEmpty()) {
-        packet.setReassembledTCPFragments(fragments.size());
-        SequencePayload prev = null;
+      // if the PSH flag is set, this does not mean enough bytes ares received to
+      // be able to decode the DNS data. If not enough bytes avail, wait for more packets.
 
-        // calc toal size of payload
-        int totalSize = 0;
-        for (SequencePayload seqPayload : fragments) {
-          totalSize += seqPayload.getPayload().length;
+      if (!fd.isNextPayloadAvail()) {
+        // uhoh not enough data, stop here and wait for next packet
+        return Packet.NULL;
+      }
+
+      // remove flow from flow map and process the flow data
+      flows.remove(flow);
+      if (fd != null && fd.size() > 0) {
+        packet.setReassembledTCPFragments(fd.size());
+        // get total size of the dns bytes reveived this can be for multiple packets
+        // and the last dns message might not be complete yet.
+        packetPayload = new byte[fd.getBytesAvail()];
+
+        // link all flow sequences into a ordered list without gaps.
+        List<SequencePayload> linkSequencePayloads =
+            linkSequencePayloads(fd.getSortedPayloads(), packet, 0);
+
+        // check if there are still enough bytes available, some duplicate sequence
+        // might have been dropped and we need to update the flowdata
+        fd.setBytesAvail(linkSequencePayloads.stream().mapToInt(s -> s.getBytes().length).sum());
+        if (linkSequencePayloads.isEmpty() || !fd.isNextPayloadAvail()) {
+          // uhoh not enough data, stop here and wait for next packet
+          return Packet.NULL;
         }
-        packetPayload = new byte[totalSize];
-        int destPos = 0;
 
         // copy all the payload bytes
-        for (SequencePayload seqPayload : fragments) {
-          if (prev != null && !seqPayload.linked(prev)) {
-            log
-                .warn("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
-                    + " has Broken sequence chain between " + seqPayload + " and " + prev
-                    + ". Returning empty payload.");
-            packetPayload = new byte[0];
-            // got chain linkage error, ignore all data, return nothing. (these bytes cannot be
-            // decoded)
-            break;
-          }
-
-          // copy all tcp data segments into a single array, packetPayload
+        int destPos = 0;
+        SequencePayload prev = null;
+        for (SequencePayload seqPayload : linkSequencePayloads) {
           System
-              .arraycopy(seqPayload.getPayload(), 0, packetPayload, destPos,
-                  seqPayload.getPayload().length);
-          destPos += seqPayload.getPayload().length;
+              .arraycopy(seqPayload.getBytes(), 0, packetPayload, destPos,
+                  seqPayload.getBytes().length);
+          destPos += seqPayload.getBytes().length;
 
           prev = seqPayload;
         }
@@ -250,22 +302,102 @@ public class TCPDecoder implements PacketReader {
         // if packet is server response then keep it in reassembledPackets map until we get a
         // ack from the client, we need the timestamp from the client ack for the RTT calculation
         if (isServer) {
-          Packet decodedDnsPacket = decodeDnsPayload(packet, packetPayload);
-          if (decodedDnsPacket != Packet.NULL) {
+          // server sending data
+          byte[] remainder = decodeDnsPayload(packet, packetPayload);
+          if (remainder.length > 0 && prev != null) {
+            createNewFlowWithRemainer(flow, remainder, prev);
+          }
+          if (packet != Packet.NULL) {
             rspPacketCounter++;
             // use the reverse flow to save the packet in reassembledPackets
             // so we can find it again using the the flow of the client.
-            reassembledPackets.put(decodedDnsPacket.getReverseFlow(), decodedDnsPacket);
+            reassembledPackets.put(packet.getReverseFlow(), packet);
           }
         } else {
+          // client sending data
           reqPacketCounter++;
-          return decodeDnsPayload(packet, packetPayload);
+          byte[] remainder = decodeDnsPayload(packet, packetPayload);
+          if (remainder.length > 0 && prev != null) {
+            createNewFlowWithRemainer(flow, remainder, prev);
+          }
         }
       }
     }
 
     // do not return any bytes yet to upper protocol decoder.
     return Packet.NULL;
+  }
+
+
+  /**
+   * Create a validated list of TCP data segments where each segments is linked to the next, based
+   * on the sequence numbers
+   * 
+   * @param seqPayloads data segments to link
+   * @param packet current packet
+   * @param trycount this method is recursive, this param is used to prevent stackoverflow
+   * @return list of linked segments, can be empty list, never null
+   */
+  private List<SequencePayload> linkSequencePayloads(List<SequencePayload> seqPayloads,
+      Packet packet, int trycount) {
+
+    // infinite recursion protection
+    if (trycount > 10) {
+      return Collections.emptyList();
+    }
+
+    SequencePayload prev = null;
+    boolean error = false;
+    for (SequencePayload seqPayload : seqPayloads) {
+      if (prev != null && !seqPayload.linked(prev)) {
+        log
+            .warn("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
+                + " has Broken sequence chain between " + seqPayload + " and " + prev);
+
+        seqPayload.setIgnore(true);
+        error = true;
+      }
+      prev = seqPayload;
+    }
+
+    if (error) {
+      // found out-of-order packets? filter error packets and retry to link all the sequences
+      // also resort the list before trying to link again
+      List<SequencePayload> newList =
+          seqPayloads.stream().filter(p -> !p.isIgnore()).sorted().collect(Collectors.toList());
+
+      return linkSequencePayloads(newList, packet, ++trycount);
+    }
+
+    // ordering is ok, all sequences are linked
+
+    return seqPayloads;
+
+  }
+
+  private boolean isNextPayloadAvail(FlowData fd) {
+    return fd != null && fd.isNextPayloadAvail();
+  }
+
+  /**
+   * Create a new flow and linked dataflow entry in the flows map, using the leftover bytes. these
+   * are the bytes that can not yet be decoded because more data is required.
+   * 
+   * @param flow current flow
+   * @param remainder the leftover bytes
+   * @param lastPayload the last sequence, this will become the 1st sequence now
+   */
+  private void createNewFlowWithRemainer(TCPFlow flow, byte[] remainder,
+      SequencePayload lastPayload) {
+    // set the remaining bytes as last payload
+    lastPayload.setBytes(remainder);
+
+    FlowData fd = new FlowData();
+    // update the flow details
+    fd.setBytesAvail(remainder.length);
+    fd.setNextDnsMsgLen(dnsMessageLen(remainder, 0));
+    fd.addPayload(lastPayload);
+    flows.put(flow, fd);
   }
 
   /**
@@ -339,7 +471,23 @@ public class TCPDecoder implements PacketReader {
     return -1;
   }
 
-  private Packet decodeDnsPayload(Packet packet, byte[] payload) {
+  private int dnsMessageLen(byte[] payload, int payloadIndex) {
+    if (payload == null || payload.length < 2) {
+      if (log.isDebugEnabled()) {
+        log
+            .debug("Reading DNS message len from failed failed, only {} bytes available",
+                payload.length);
+      }
+
+      return 0;
+    }
+    byte[] lenBytes = new byte[2];
+    System.arraycopy(payload, payloadIndex, lenBytes, 0, 2);
+    return PcapReaderUtil.convertShort(lenBytes);
+  }
+
+  private byte[] decodeDnsPayload(Packet packet, byte[] payload) {
+
 
     /*
      * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
@@ -347,9 +495,7 @@ public class TCPDecoder implements PacketReader {
      */
     int payloadIndex = 0;
     while ((payload.length > TCPDecoder.TCP_DNS_LENGTH_PREFIX) && (payloadIndex < payload.length)) {
-      byte[] lenBytes = new byte[2];
-      System.arraycopy(payload, payloadIndex, lenBytes, 0, 2);
-      int msgLen = PcapReaderUtil.convertShort(lenBytes);
+      int msgLen = dnsMessageLen(payload, payloadIndex);
       // add the 2byte msg len
       payloadIndex += 2;
       if (msgLen > 0 && (payloadIndex + msgLen) <= payload.length) {
@@ -359,20 +505,24 @@ public class TCPDecoder implements PacketReader {
         // add the msg len to the index
         payloadIndex += msgLen;
       } else {
-        // invalid msg len
-        if (log.isDebugEnabled()) {
-          log
-              .debug("Invalid TCP payload length, msgLen= " + msgLen + " tcpOrUdpPayload.length= "
-                  + payload.length + " ack=" + packet.isTcpFlagAck());
-        }
-        break;
+        // dns msg requires more bytes than are available
+        // might be partial data for the next dns msg
+        // return the bytes, mkae sure to also include the 2-byte dns msg len prefix
+        int index = payloadIndex - 2;
+        byte[] remainingBytes = new byte[payload.length - index];
+        System.arraycopy(payload, index, remainingBytes, 0, remainingBytes.length);
+
+        // return any bytes that could not be decoded because not enough bytes are available yet.
+        // this bytes will be combined with the bytes from the next packets from the pcap stream
+        return remainingBytes;
       }
     }
     if (log.isDebugEnabled() && ((DNSPacket) packet).getMessageCount() > 1) {
       log.debug("multiple msg in TCP stream");
     }
 
-    return packet;
+    // return any bytes leftover, might be partial data foir the next dns msg
+    return new byte[0];
   }
 
 }

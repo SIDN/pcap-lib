@@ -22,6 +22,7 @@ package nl.sidnlabs.pcap;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -169,10 +170,6 @@ public class PcapReader {
     // after calling IpDecoder::decode use the method result
     Packet decodedPacket = ipDecoder.decode(packet, packetData, ipStart);
 
-    if (decodedPacket == Packet.NULL && log.isDebugEnabled()) {
-      log.debug(Hex.encodeHexString(packetData));
-    }
-
     packetCounter++;
     return decodedPacket;
   }
@@ -249,11 +246,11 @@ public class PcapReader {
     }
   }
 
-  public Multimap<TCPFlow, SequencePayload> getFlows() {
+  public Map<TCPFlow, FlowData> getFlows() {
     return tcpDecoder.getFlows();
   }
 
-  public void setFlows(Multimap<TCPFlow, SequencePayload> flows) {
+  public void setFlows(Map<TCPFlow, FlowData> flows) {
     tcpDecoder.setFlows(flows);
   }
 

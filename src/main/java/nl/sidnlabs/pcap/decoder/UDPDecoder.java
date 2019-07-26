@@ -35,8 +35,16 @@ import nl.sidnlabs.pcap.util.UDPUtil;
 @Data
 public class UDPDecoder implements PacketReader {
 
+  private DNSDecoder dnsDecoder;
 
-  private DNSDecoder dnsDecoder = new DNSDecoder();
+  public UDPDecoder() {
+    this(false);
+  }
+
+  public UDPDecoder(boolean allowfail) {
+    dnsDecoder = new DNSDecoder(allowfail);
+  }
+
 
   /**
    * Decode the udp packet, supports reassembly of fragmented packets

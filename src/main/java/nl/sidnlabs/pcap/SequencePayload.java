@@ -22,6 +22,7 @@ package nl.sidnlabs.pcap;
 import com.google.common.collect.ComparisonChain;
 import lombok.Data;
 import lombok.ToString;
+import nl.sidnlabs.pcap.packet.TCPFlow;
 
 /**
  * Class for re-assembly of TCP fragments
@@ -31,15 +32,19 @@ import lombok.ToString;
 public class SequencePayload implements Comparable<SequencePayload> {
   private Long seq;
   @ToString.Exclude
-  private byte[] payload;
+  private byte[] bytes;
   private long time;
+  private long nextSequence;
+  // ignore = true when payload is received out of order
+  private boolean ignore;
 
   public SequencePayload() {}
 
-  public SequencePayload(Long seq, byte[] payload, long time) {
+  public SequencePayload(Long seq, byte[] bytes, long time, TCPFlow flow) {
     this.seq = seq;
-    this.payload = payload;
+    this.bytes = bytes;
     this.time = time;
+    this.nextSequence = seq + bytes.length;
   }
 
   @Override
@@ -47,15 +52,15 @@ public class SequencePayload implements Comparable<SequencePayload> {
     return ComparisonChain
         .start()
         .compare(seq, o.seq)
-        .compare(payload.length, o.payload.length)
+        .compare(bytes.length, o.bytes.length)
         .result();
   }
 
   public boolean linked(SequencePayload o) {
-    if ((seq + payload.length) == o.seq)
+    if (nextSequence == o.seq)
       return true;
 
-    return (o.seq + o.payload.length) == seq;
+    return (o.getNextSequence()) == seq;
   }
 
 }

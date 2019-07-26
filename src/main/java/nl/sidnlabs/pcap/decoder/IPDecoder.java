@@ -23,11 +23,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Bytes;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import nl.sidnlabs.pcap.FlowData;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.SequencePayload;
 import nl.sidnlabs.pcap.packet.DNSPacket;
@@ -154,23 +157,21 @@ public class IPDecoder {
       return icmpPacket;
     }
 
-    Packet dnsPacket = null;
-
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
       // found TCP protocol
-      dnsPacket = tcpReader.reassemble(packet, packetData, offset);
+      tcpReader.reassemble(packet, packetData, offset);
     } else if (PacketFactory.PROTOCOL_UDP == packet.getProtocol()) {
       // found UDP protocol
-      dnsPacket = udpReader.reassemble(packet, packetData, offset);
+      udpReader.reassemble(packet, packetData, offset);
     }
 
-    if ((dnsPacket == null || dnsPacket == Packet.NULL)
-        || (dnsPacket instanceof DNSPacket && ((DNSPacket) dnsPacket).getMessageCount() == 0)) {
+    if (packet == Packet.NULL
+        || (packet instanceof DNSPacket && ((DNSPacket) packet).getMessageCount() == 0)) {
       // no dns message(s) found
       return Packet.NULL;
     }
 
-    return dnsPacket;
+    return packet;
   }
 
   private void decodeV6Fragmented(Packet packet, int ipStart, byte[] packetData) {
@@ -290,12 +291,11 @@ public class IPDecoder {
     // clear tcp flows with expired packets
     List<TCPFlow> expiredList = new ArrayList<>();
     long now = System.currentTimeMillis();
-    Multimap<TCPFlow, SequencePayload> flows = ((TCPDecoder) tcpReader).getFlows();
-    for (TCPFlow flow : flows.keySet()) {
-      Collection<SequencePayload> payloads = flows.get(flow);
-      for (SequencePayload sequencePayload : payloads) {
+    Map<TCPFlow, FlowData> flows = ((TCPDecoder) tcpReader).getFlows();
+    for (Entry<TCPFlow, FlowData> entry : flows.entrySet()) {
+      for (SequencePayload sequencePayload : entry.getValue().getPayloads()) {
         if ((sequencePayload.getTime() + tcpFlowCacheTimeout) <= now) {
-          expiredList.add(flow);
+          expiredList.add(entry.getKey());
           break;
         }
       }
@@ -319,7 +319,7 @@ public class IPDecoder {
 
     // remove flows with expired packets
     for (TCPFlow tcpFlow : expiredList) {
-      flows.removeAll(tcpFlow);
+      flows.remove(tcpFlow);
     }
 
     for (Datagram dg : dgExpiredList) {

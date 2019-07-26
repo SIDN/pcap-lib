@@ -21,7 +21,6 @@ package nl.sidnlabs.pcap.packet;
 
 import com.google.common.collect.ComparisonChain;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 @Data
 public class TCPFlow implements Comparable<TCPFlow> {
@@ -30,11 +29,6 @@ public class TCPFlow implements Comparable<TCPFlow> {
   private String dst;
   private int dstPort;
   private short protocol;
-
-  @EqualsAndHashCode.Exclude
-  private long lastSequence;
-  @EqualsAndHashCode.Exclude
-  private boolean retransmission;
 
   public TCPFlow() {}
 

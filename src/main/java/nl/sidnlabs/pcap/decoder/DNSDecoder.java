@@ -34,8 +34,15 @@ import nl.sidnlabs.pcap.packet.Packet;
 @Log4j2
 public class DNSDecoder {
 
+  // if true then ignore any error, this can happen when decoding
+  // partial dns messages that are the payload in ICMP packets.
+  private boolean allowFail;
   private int dnsDecodeError;
   private int messageCounter;
+
+  public DNSDecoder(boolean allowFail) {
+    this.allowFail = allowFail;
+  }
 
   public Packet decode(Packet packet, byte[] payload) {
 
@@ -44,6 +51,10 @@ public class DNSDecoder {
       dnsPacket.pushMessage(new Message(new NetworkData(payload)));
       messageCounter++;
     } catch (Exception e) {
+      if (allowFail) {
+        return packet;
+      }
+
       if (log.isDebugEnabled()) {
         log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
       }
