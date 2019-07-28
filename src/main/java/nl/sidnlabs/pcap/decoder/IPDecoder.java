@@ -19,27 +19,22 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
+import java.util.stream.Collectors;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Bytes;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
-import nl.sidnlabs.pcap.FlowData;
 import nl.sidnlabs.pcap.PcapReaderUtil;
-import nl.sidnlabs.pcap.SequencePayload;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
 import nl.sidnlabs.pcap.packet.ICMPPacket;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.PacketFactory;
-import nl.sidnlabs.pcap.packet.TCPFlow;
 import nl.sidnlabs.pcap.util.IPv4Util;
 import nl.sidnlabs.pcap.util.IPv6Util;
 
@@ -284,47 +279,21 @@ public class IPDecoder {
   /**
    * Clear expired cache entries in order to avoid memory problems
    * 
-   * @param tcpFlowCacheTimeout timeout for tcp flows
-   * @param fragmentedIPcacheTimeout timeout for IP fragments
+   * @param ipFragmentTTL timeout for IP fragments
    */
-  public void clearCache(int tcpFlowCacheTimeout, int fragmentedIPcacheTimeout) {
-    // clear tcp flows with expired packets
-    List<TCPFlow> expiredList = new ArrayList<>();
+  public void clearCache(int ipFragmentTTL) {
     long now = System.currentTimeMillis();
-    Map<TCPFlow, FlowData> flows = ((TCPDecoder) tcpReader).getFlows();
-    for (Entry<TCPFlow, FlowData> entry : flows.entrySet()) {
-      for (SequencePayload sequencePayload : entry.getValue().getPayloads()) {
-        if ((sequencePayload.getTime() + tcpFlowCacheTimeout) <= now) {
-          expiredList.add(entry.getKey());
-          break;
-        }
-      }
-    }
-
     // check IP datagrams
-    List<Datagram> dgExpiredList = new ArrayList<>();
+    List<Datagram> dgExpiredList = datagrams
+        .keySet()
+        .stream()
+        .filter(k -> (k.getTime() + ipFragmentTTL) <= now)
+        .collect(Collectors.toList());
 
-    for (Datagram dg : getDatagrams().keySet()) {
-      if ((dg.getTime() + fragmentedIPcacheTimeout) <= now) {
-        dgExpiredList.add(dg);
-      }
-    }
-
-    log.info("------------- Cache purge stats --------------");
-    log.info("TCP flow cache size: " + flows.size());
-    log.info("IP datagram cache size: " + getDatagrams().size());
-    log.info("Expired (to be removed) TCP flows: " + expiredList.size());
+    log.info("IP datagram cache size: " + datagrams.size());
     log.info("Expired (to be removed) IP datagrams: " + dgExpiredList.size());
-    log.info("----------------------------------------------------");
 
-    // remove flows with expired packets
-    for (TCPFlow tcpFlow : expiredList) {
-      flows.remove(tcpFlow);
-    }
-
-    for (Datagram dg : dgExpiredList) {
-      getDatagrams().removeAll(dg);
-    }
-
+    // remove expired IP datagrams
+    dgExpiredList.stream().forEach(dg -> datagrams.removeAll(dg));
   }
 }

@@ -51,14 +51,12 @@ public class DNSDecoder {
       dnsPacket.pushMessage(new Message(new NetworkData(payload)));
       messageCounter++;
     } catch (Exception e) {
-      if (allowFail) {
-        return packet;
+      if (!allowFail) {
+        if (log.isDebugEnabled()) {
+          log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
+        }
+        dnsDecodeError++;
       }
-
-      if (log.isDebugEnabled()) {
-        log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
-      }
-      dnsDecodeError++;
     }
 
     return packet;

@@ -19,10 +19,12 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -183,23 +185,21 @@ public class TCPDecoder implements PacketReader {
     }
 
     // FlowData is used to keep a list of all data-segments (sequences) linked to the current flow
-    FlowData fd = null;
+    FlowData fd = flows.get(flow);
+    if (fd == null) {
+      if (packetPayload.length < TCP_DNS_LENGTH_PREFIX) {
+        // first packet did not have enough data (2-bytes) for the dns message length prefix
+        // probably malformed packet, ignore packet
+        return Packet.NULL;
+      }
+      // this is the 1st segment for this flow, create new FlowData
+      fd = new FlowData();
+      flows.put(flow, fd);
+    }
     // save all tcp payload data until we get a signal to push the data up the stack
     if (hasPayload) {
       SequencePayload sequencePayload =
           new SequencePayload(packet.getTcpSeq(), packetPayload, System.currentTimeMillis(), flow);
-
-      fd = flows.get(flow);
-      if (fd == null) {
-        if (packetPayload.length < TCP_DNS_LENGTH_PREFIX) {
-          // first packet did not have enough data (2-bytes) for the dns message length prefix
-          // probably malformed packet, ignore packet
-          return Packet.NULL;
-        }
-        // this is the 1st segment for this flow, create new FlowData
-        fd = new FlowData();
-        flows.put(flow, fd);
-      }
 
       // add the segment/sequence to flowdata
       if (!fd.addPayload(sequencePayload)) {
@@ -251,6 +251,10 @@ public class TCPDecoder implements PacketReader {
 
       // if the PSH flag is set, this does not mean enough bytes ares received to
       // be able to decode the DNS data. If not enough bytes avail, wait for more packets.
+
+      if (fd == null) {
+        System.out.println("stop");
+      }
 
       if (!fd.isNextPayloadAvail()) {
         // uhoh not enough data, stop here and wait for next packet
@@ -520,6 +524,26 @@ public class TCPDecoder implements PacketReader {
 
     // return any bytes leftover, might be partial data foir the next dns msg
     return new byte[0];
+  }
+
+  public void clearCache(int cacheTTL) {
+    // clear tcp flows with expired packets
+    List<TCPFlow> expiredList = new ArrayList<>();
+    long now = System.currentTimeMillis();
+    for (Entry<TCPFlow, FlowData> entry : flows.entrySet()) {
+      for (SequencePayload sequencePayload : entry.getValue().getPayloads()) {
+        if ((sequencePayload.getTime() + cacheTTL) <= now) {
+          expiredList.add(entry.getKey());
+          break;
+        }
+      }
+    }
+
+    log.info("TCP flow cache size: " + flows.size());
+    log.info("Expired (to be removed) TCP flows: " + expiredList.size());
+
+    // remove flows with expired packets
+    expiredList.stream().forEach(s -> flows.remove(s));
   }
 
 }

@@ -110,11 +110,12 @@ public class PcapReader {
   /**
    * Clear expired cache entries in order to avoid memory problems
    * 
-   * @param tcpFlowCacheTimeout timeout for tcp flows
-   * @param fragmentedIPcacheTimeout timeout for IP fragments
+   * @param tcpCacheTTL timeout for tcp flows
+   * @param ipCacheTTL timeout for IP fragments
    */
-  public void clearCache(int tcpFlowCacheTimeout, int fragmentedIPcacheTimeout) {
-    ipDecoder.clearCache(tcpFlowCacheTimeout, fragmentedIPcacheTimeout);
+  public void clearCache(int tcpCacheTTL, int ipCacheTTL) {
+    ipDecoder.clearCache(ipCacheTTL);
+    tcpDecoder.clearCache(tcpCacheTTL);
   }
 
   public void close() {
@@ -129,6 +130,7 @@ public class PcapReader {
     byte[] pcapPacketHeader = new byte[PACKET_HEADER_SIZE];
     if (!readBytes(pcapPacketHeader)) {
       // no more data left
+      log.info("Reached end of file, or zero-length file?");
       return null;
     }
 
