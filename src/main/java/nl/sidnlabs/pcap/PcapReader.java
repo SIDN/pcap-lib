@@ -35,6 +35,7 @@ import nl.sidnlabs.pcap.decoder.TCPDecoder;
 import nl.sidnlabs.pcap.decoder.UDPDecoder;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
+import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.TCPFlow;
 

@@ -65,13 +65,6 @@ public class UDPDecoder implements PacketReader {
             .convertShort(packetData,
                 offset + packet.getIpHeaderLen() + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
-    if (packet.getIpVersion() == 4) {
-      int cksum = UDPUtil.getUdpChecksum(packetData, offset, packet.getIpHeaderLen());
-      if (cksum >= 0) {
-        packet.setUdpsum(cksum);
-      }
-    }
-
     byte[] packetPayload = decode(packet, packetData, offset);
 
     // total length of packet, might be wrong if icmp truncation is in play

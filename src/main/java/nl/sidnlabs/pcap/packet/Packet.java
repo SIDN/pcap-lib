@@ -57,14 +57,11 @@ public class Packet {
   protected int reassembledFragments;
   // ipv6
   protected boolean fragmentFlagM;
-  // udp tcp
+  // tcp
   protected int reassembledTCPFragments;
   protected int srcPort;
   protected int dstPort;
   protected int tcpflow;
-  // udp
-  protected int udpsum;
-  // tcp
   protected int tcpHeaderLen;
   protected long tcpSeq;
   protected long tcpAck;
