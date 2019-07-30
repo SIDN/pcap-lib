@@ -128,7 +128,7 @@ public class TCPDecoder implements PacketReader {
   public Packet reassemble(Packet packet, byte[] packetData) {
     byte[] packetPayload = decode(packet, packetData);
 
-    if (packet.getSrcPort() != PcapReader.DNS_PORT && packet.getDstPort() != PcapReader.DNS_PORT) {
+    if (!isDNS(packet)) {
       // not a dns packet, ignore
       return Packet.NULL;
     }
