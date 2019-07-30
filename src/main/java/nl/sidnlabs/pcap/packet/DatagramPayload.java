@@ -26,7 +26,7 @@ import lombok.ToString;
 
 @Data
 public class DatagramPayload implements Comparable<DatagramPayload> {
-  private Long offset;
+  private long offset;
   @ToString.Exclude
   private byte[] payload;
 

@@ -54,29 +54,14 @@ public class UDPDecoder implements PacketReader {
    * @return payload bytes or null if not a valid packet
    */
   @Override
-  public Packet reassemble(Packet packet, byte[] packetData, int offset) {
+  public Packet reassemble(Packet packet, byte[] packetData) {
 
     packet
-        .setSrcPort(PcapReaderUtil
-            .convertShort(packetData,
-                offset + packet.getIpHeaderLen() + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+        .setSrcPort(
+            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
     packet
-        .setDstPort(PcapReaderUtil
-            .convertShort(packetData,
-                offset + packet.getIpHeaderLen() + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
-
-    byte[] packetPayload = decode(packet, packetData, offset);
-
-    // total length of packet, might be wrong if icmp truncation is in play
-    packet.setLen(packetData.length);
-    packet.setPayloadLength(UDPUtil.getUdpLen(packetData, offset, packet.getIpHeaderLen()));
-
-
-    if (packet.getFragOffset() == 0 && packet.getSrcPort() != PcapReader.DNS_PORT
-        && packet.getDstPort() != PcapReader.DNS_PORT) {
-      // not a dns packet
-      packetPayload = new byte[0];
-    }
+        .setDstPort(
+            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     if (!isDNS(packet)) {
       // not a dns packet
@@ -86,6 +71,7 @@ public class UDPDecoder implements PacketReader {
       return Packet.NULL;
     }
 
+    byte[] packetPayload = decode(packet, packetData);
     if (packetPayload.length == 0) {
       // no DNS packets found
       if (log.isDebugEnabled()) {
@@ -94,13 +80,15 @@ public class UDPDecoder implements PacketReader {
       return Packet.NULL;
     }
 
+    // total length of packet, might be wrong if icmp truncation is in play
+    packet.setLen(packetData.length);
+    packet.setPayloadLength(UDPUtil.getUdpLen(packetData));
+
     return dnsDecoder.decode((DNSPacket) packet, packetPayload);
   }
 
-  public byte[] decode(Packet packet, byte[] packetData, int offset) {
-    int payloadDataStart = offset + packet.getIpHeaderLen() + UDPUtil.UDP_HEADER_SIZE;
-    int payloadLength = packetData.length - packet.getIpHeaderLen() - UDPUtil.UDP_HEADER_SIZE;
-
-    return PcapReaderUtil.readPayload(packetData, payloadDataStart, payloadLength);
+  public byte[] decode(Packet packet, byte[] packetData) {
+    int payloadLength = packetData.length - UDPUtil.UDP_HEADER_SIZE;
+    return PcapReaderUtil.readPayload(packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
   }
 }

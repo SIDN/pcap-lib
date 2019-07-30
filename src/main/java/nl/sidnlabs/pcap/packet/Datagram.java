@@ -27,11 +27,11 @@ import lombok.Data;
 public class Datagram implements Comparable<Datagram> {
   private String src;
   private String dst;
-  private Long id;
+  private long id;
   private String protocol;
   private long time;
 
-  public Datagram(String src, String dst, Long id, String protocol, long time) {
+  public Datagram(String src, String dst, long id, String protocol, long time) {
     this.src = src;
     this.dst = dst;
     this.id = id;
@@ -41,10 +41,13 @@ public class Datagram implements Comparable<Datagram> {
 
   @Override
   public int compareTo(Datagram o) {
-    return ComparisonChain.start().compare(src, o.src, Ordering.natural().nullsLast())
+    return ComparisonChain
+        .start()
+        .compare(src, o.src, Ordering.natural().nullsLast())
         .compare(dst, o.dst, Ordering.natural().nullsLast())
         .compare(id, o.id, Ordering.natural().nullsLast())
-        .compare(protocol, o.protocol, Ordering.natural().nullsLast()).result();
+        .compare(protocol, o.protocol, Ordering.natural().nullsLast())
+        .result();
   }
 
 }

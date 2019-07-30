@@ -39,13 +39,10 @@ public class UDPUtil {
    * Get size of udp packet payload
    * 
    * @param packetData data
-   * @param offset start of data
-   * @param ipHeaderLen size of ip header
    * @return length of udp packet
    */
-  public static int getUdpLen(byte[] packetData, int offset, int ipHeaderLen) {
-    return PcapReaderUtil.convertShort(packetData, offset + ipHeaderLen + UDP_HEADER_LEN_OFFSET)
-        - UDP_HEADER_SIZE;
+  public static int getUdpLen(byte[] packetData) {
+    return PcapReaderUtil.convertShort(packetData, UDP_HEADER_LEN_OFFSET) - UDP_HEADER_SIZE;
   }
 
 }

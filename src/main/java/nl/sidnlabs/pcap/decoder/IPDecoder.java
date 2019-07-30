@@ -107,21 +107,22 @@ public class IPDecoder {
     // check for presence of ethernet padding, eth frames must be minumum of 64bytes
     // and eth adapters can add padding to get 64 byte packet size
     int padding = packetData.length - (totalLength + ipStart);
-    if (padding > 0) {
-      /*
-       * make sure there is no ethernet padding present. see: https://wiki.wireshark.org/Ethernet
-       * padding present, copy all data except the padding, to avoid problems decoding tcp/udp/dns
-       */
-      packetData = Arrays.copyOfRange(packetData, ipStart, packetData.length - padding);
-    }
+    /*
+     * Copy the IP payload into a packetData. Make sure there is no ethernet padding present. see:
+     * https://wiki.wireshark.org/Ethernet padding present, copy all data except the padding, to
+     * avoid problems decoding tcp/udp/dns
+     */
+    packetData = Arrays
+        .copyOfRange(packetData, ipStart + packet.getIpHeaderLen(), packetData.length - padding);
 
-    byte[] reassembledData = reassemble(packet, packetData, ipStart);
-    // if reassembledData is empty then the IP packet is fragmented and is not the final fragment
+    byte[] reassembledData = reassemble(packet, packetData);
+    // if reassembledData is empty then the IP packet is fragmented and the current packet is not
+    // yet the final fragment
     if (reassembledData.length == 0) {
       return Packet.NULL;
     }
 
-    return handlePayload(packet, packetData, ipStart);
+    return handlePayload(packet, reassembledData);
   }
 
 
@@ -140,13 +141,13 @@ public class IPDecoder {
     return PacketFactory.create(protocol);
   }
 
-  private Packet handlePayload(Packet packet, byte[] packetData, int offset) {
+  private Packet handlePayload(Packet packet, byte[] packetData) {
 
     if ((PacketFactory.PROTOCOL_ICMP_V4 == packet.getProtocol())
         || (PacketFactory.PROTOCOL_ICMP_V6 == packet.getProtocol())) {
       // found icmp protocol
       ICMPPacket icmpPacket = (ICMPPacket) packet;
-      icmpDecoder.reassemble(icmpPacket, packetData, offset);
+      icmpDecoder.reassemble(icmpPacket, packetData);
       // do not process icmp packet further, because the dns packet might be corrupt (only 8 bytes
       // in icmp packet)
       return icmpPacket;
@@ -154,10 +155,10 @@ public class IPDecoder {
 
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
       // found TCP protocol
-      tcpReader.reassemble(packet, packetData, offset);
+      tcpReader.reassemble(packet, packetData);
     } else if (PacketFactory.PROTOCOL_UDP == packet.getProtocol()) {
       // found UDP protocol
-      udpReader.reassemble(packet, packetData, offset);
+      udpReader.reassemble(packet, packetData);
     }
 
     if (packet == Packet.NULL
@@ -206,66 +207,65 @@ public class IPDecoder {
   }
 
 
-  public byte[] reassemble(Packet packet, byte[] packetData, int ipStart) {
-    // reassemble IP fragments
-    byte[] reassmbledPacketData = packetData;
+  /**
+   * Reassemble the IP packet is it is fragmented. If it is not fragmented then the packetData bytes
+   * are returned as result. If the packet is fragmented and this packet is the final fragment then
+   * all the bytes from the fragments are concatenated and returned. if fragmented and current
+   * fragment is not yet the final fragment then an empty byte array is returned. the
+   * 
+   * @param packet the current packet
+   * @param packetData the payload of the current packet
+   * @return input, reassembled or no bytes
+   */
+  public byte[] reassemble(Packet packet, byte[] packetData) {
 
-    if (packet.isFragmented()) {
-
-      Datagram datagram = packet.getDatagram();
-      byte[] fragmentPacketData = Arrays
-          .copyOfRange(packetData, ipStart + packet.getIpHeaderLen(),
-              ipStart + packet.getTotalLength());
-      DatagramPayload payload = new DatagramPayload(packet.getFragOffset(), fragmentPacketData);
-      datagrams.put(datagram, payload);
-
-      if (packet.isLastFragment()) {
-        Collection<DatagramPayload> datagramPayloads = datagrams.removeAll(datagram);
-        if (datagramPayloads != null && !datagramPayloads.isEmpty()) {
-          reassmbledPacketData =
-              Arrays.copyOfRange(packetData, 0, ipStart + packet.getIpHeaderLen()); // Start
-                                                                                    // re-fragmented
-                                                                                    // packet with
-                                                                                    // IP header
-                                                                                    // from current
-                                                                                    // packet
-
-          int reassembledFragments = 0;
-          DatagramPayload prev = null;
-          for (DatagramPayload datagramPayload : datagramPayloads) {
-            if (prev == null && datagramPayload.getOffset() != 0) {
-              if (log.isDebugEnabled()) {
-                log
-                    .debug(
-                        "Datagram chain not starting at 0. Probably received packets out-of-order. Can't reassemble this packet.");
-              }
-              // do not even try to reasemble the data, probably corrupt packets.
-              return new byte[0];
-            }
-            if (prev != null && !datagramPayload.linked(prev)) {
-              if (log.isDebugEnabled()) {
-                log
-                    .debug("Broken datagram chain between " + datagramPayload + " and " + prev
-                        + ". Can't reassemble this packet.");
-              }
-              // do not even try to reasemble the data, probably corrupt packets.
-              return new byte[0];
-            }
-            reassmbledPacketData = Bytes.concat(reassmbledPacketData, datagramPayload.getPayload());
-            reassembledFragments++;
-            prev = datagramPayload;
-          }
-          if (reassembledFragments == datagramPayloads.size()) {
-            packet.setReassembledFragments(reassembledFragments);
-          }
-        }
-
-      } else {
-        // need last IP fragment before continu to tcp/udp reassembly
-        reassmbledPacketData = new byte[0];
-      }
+    if (!packet.isFragmented()) {
+      return packetData;
     }
-    return reassmbledPacketData;
+
+    Datagram datagram = packet.getDatagram();
+    DatagramPayload payload = new DatagramPayload(packet.getFragOffset(), packetData);
+    datagrams.put(datagram, payload);
+
+    if (packet.isLastFragment()) {
+      byte[] reassembledPacketData = new byte[0];
+      // reassemble IP fragments
+      Collection<DatagramPayload> datagramPayloads = datagrams.removeAll(datagram);
+      if (datagramPayloads != null && !datagramPayloads.isEmpty()) {
+        int reassembledFragments = 0;
+        DatagramPayload prev = null;
+        for (DatagramPayload datagramPayload : datagramPayloads) {
+          if (prev == null && datagramPayload.getOffset() != 0) {
+            if (log.isDebugEnabled()) {
+              log
+                  .debug(
+                      "Datagram chain not starting at 0. Probably received packets out-of-order. Can't reassemble this packet.");
+            }
+            // do not even try to reassemble the data, probably corrupt packets.
+            return new byte[0];
+          }
+          if (prev != null && !datagramPayload.linked(prev)) {
+            if (log.isDebugEnabled()) {
+              log
+                  .debug("Broken datagram chain between " + datagramPayload + " and " + prev
+                      + ". Can't reassemble this packet.");
+            }
+            // do not even try to reassemble the data, probably corrupt packets.
+            return new byte[0];
+          }
+          reassembledPacketData = Bytes.concat(reassembledPacketData, datagramPayload.getPayload());
+          reassembledFragments++;
+          prev = datagramPayload;
+        }
+        packet.setReassembledFragments(reassembledFragments);
+      }
+
+      return reassembledPacketData;
+    }
+
+    // need final IP fragment before continu to tcp/udp reassembly
+    // until then return empty byte array
+    return new byte[0];
   }
 
   public Multimap<Datagram, DatagramPayload> getDatagrams() {

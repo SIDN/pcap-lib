@@ -68,36 +68,27 @@ public class TCPDecoder implements PacketReader {
   }
 
 
-  public byte[] decode(Packet packet, byte[] packetData, int offset) {
+  public byte[] decode(Packet packet, byte[] packetData) {
     packet
-        .setSrcPort(PcapReaderUtil
-            .convertShort(packetData,
-                offset + packet.getIpHeaderLen() + PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+        .setSrcPort(
+            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
     packet
-        .setDstPort(PcapReaderUtil
-            .convertShort(packetData,
-                offset + packet.getIpHeaderLen() + PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+        .setDstPort(
+            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
-    int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData, offset + packet.getIpHeaderLen());
+    int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData);
     if (tcpOrUdpHeaderSize == -1) {
       return new byte[0];
     }
     packet.setTcpHeaderLen(tcpOrUdpHeaderSize);
 
     // Store the sequence and acknowledgement numbers --M
-    packet
-        .setTcpSeq(PcapReaderUtil
-            .convertUnsignedInt(packetData,
-                offset + packet.getIpHeaderLen() + PROTOCOL_HEADER_TCP_SEQ_OFFSET));
-    packet
-        .setTcpAck(PcapReaderUtil
-            .convertUnsignedInt(packetData,
-                offset + packet.getIpHeaderLen() + PROTOCOL_HEADER_TCP_ACK_OFFSET));
+    packet.setTcpSeq(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_SEQ_OFFSET));
+    packet.setTcpAck(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_ACK_OFFSET));
     // Flags stretch two bytes starting at the TCP header offset
     int flags = PcapReaderUtil
         .convertShort(
-            new byte[] {packetData[offset + packet.getIpHeaderLen() + TCP_HEADER_DATA_OFFSET],
-                packetData[offset + packet.getIpHeaderLen() + TCP_HEADER_DATA_OFFSET + 1]})
+            new byte[] {packetData[TCP_HEADER_DATA_OFFSET], packetData[TCP_HEADER_DATA_OFFSET + 1]})
         & 0x1FF; // Filter first 7 bits. First 4 are the data offset and the other 3 reserved for
                  // future use.
 
@@ -113,14 +104,12 @@ public class TCPDecoder implements PacketReader {
 
     // WINDOW size
     packet
-        .setTcpWindowSize(PcapReaderUtil
-            .convertShort(packetData,
-                offset + packet.getIpHeaderLen() + PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
+        .setTcpWindowSize(
+            PcapReaderUtil.convertShort(packetData, PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
 
-    int payloadDataStart = offset + packet.getIpHeaderLen() + tcpOrUdpHeaderSize;
-    int payloadLength = packetData.length - payloadDataStart;
+    int payloadLength = packetData.length - tcpOrUdpHeaderSize;
 
-    byte[] data = PcapReaderUtil.readPayload(packetData, payloadDataStart, payloadLength);
+    byte[] data = PcapReaderUtil.readPayload(packetData, tcpOrUdpHeaderSize, payloadLength);
 
     packet.setPayloadLength(payloadLength);
     // total length of packet
@@ -134,11 +123,10 @@ public class TCPDecoder implements PacketReader {
    * 
    * @param packet network packet
    * @param packetData data to assemble
-   * @param offset start of data in packetData
    * @return reassembled packet of NULL packet
    */
-  public Packet reassemble(Packet packet, byte[] packetData, int offset) {
-    byte[] packetPayload = decode(packet, packetData, offset);
+  public Packet reassemble(Packet packet, byte[] packetData) {
+    byte[] packetPayload = decode(packet, packetData);
 
     if (packet.getSrcPort() != PcapReader.DNS_PORT && packet.getDstPort() != PcapReader.DNS_PORT) {
       // not a dns packet, ignore
@@ -408,6 +396,12 @@ public class TCPDecoder implements PacketReader {
   private boolean handshake(Packet packet, boolean server) {
     // check if client sent syn
     if (!server && packet.isTcpFlagSyn() && !packet.isTcpFlagAck()) {
+      if (handshakes.containsKey(packet.getFlow())) {
+        // found SYN packet while a SYN was already received, probably retransmission of
+        // SYN packet by client, ignore this handshake.
+        handshakes.remove(packet.getFlow());
+        return true;
+      }
       // this is a client syn for a new TCP connection, create handshake and return
       TcpHandshake handshake = new TcpHandshake(packet.getTcpSeq());
       handshake.setSynTs(packet.getTsMilli());
@@ -461,10 +455,9 @@ public class TCPDecoder implements PacketReader {
     return false;
   }
 
-  private int getTcpHeaderLength(byte[] packet, int tcpStart) {
-    int dataOffset = tcpStart + TCP_HEADER_DATA_OFFSET;
-    if (dataOffset < packet.length) {
-      return ((packet[dataOffset] >> 4) & 0xF) * 4;
+  private int getTcpHeaderLength(byte[] packet) {
+    if (TCP_HEADER_DATA_OFFSET < packet.length) {
+      return ((packet[TCP_HEADER_DATA_OFFSET] >> 4) & 0xF) * 4;
     }
     // invalid header
     return -1;
@@ -486,8 +479,6 @@ public class TCPDecoder implements PacketReader {
   }
 
   private byte[] decodeDnsPayload(Packet packet, byte[] payload) {
-
-
     /*
      * TCP flow may contain multiple dns messages break the TCP flow into the individual dns msg
      * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.

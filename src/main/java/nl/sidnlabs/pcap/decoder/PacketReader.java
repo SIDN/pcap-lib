@@ -5,11 +5,10 @@ import nl.sidnlabs.pcap.packet.Packet;
 
 public interface PacketReader {
 
-  Packet reassemble(Packet packet, byte[] packetData, int offset);
+  Packet reassemble(Packet packet, byte[] packetData);
 
   default boolean isDNS(Packet packet) {
-    return packet.getFragOffset() == 0 && (packet.getSrcPort() == PcapReader.DNS_PORT
-        || packet.getDstPort() == PcapReader.DNS_PORT);
+    return packet.getSrcPort() == PcapReader.DNS_PORT || packet.getDstPort() == PcapReader.DNS_PORT;
   }
 
 }
