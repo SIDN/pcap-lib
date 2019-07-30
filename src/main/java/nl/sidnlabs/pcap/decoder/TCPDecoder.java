@@ -184,6 +184,26 @@ public class TCPDecoder implements PacketReader {
       }
     }
 
+    // check if this is a ack for the server response
+    if (!isServer && packet.isTcpFlagAck()) {
+      // get resassembledPacket packet using client flow
+      Packet resassembledPacket = reassembledPackets.remove(packet.getFlow());
+      // check if the client ack is for the correct server response.
+      if (resassembledPacket != null) {
+        // found a resassembledPacket packet waiting to be returned, use the
+        // timestamp of the current ack packet for RTT calculation
+        // Only do this when NO RETRANSMISSIONS have been detected
+        // because we cannot now which packet the client will ack the original packet or any of the
+        // retransmissions. See: https://en.wikipedia.org/wiki/Karn%27s_algorithm
+        if (!resassembledPacket.isTcpRetransmission()
+            && resassembledPacket.nextAck() == packet.getTcpAck()) {
+          resassembledPacket
+              .setTcpPacketRtt((int) (packet.getTsMilli() - resassembledPacket.getTsMilli()));
+        }
+        return resassembledPacket;
+      }
+    }
+
     // FlowData is used to keep a list of all data-segments (sequences) linked to the current flow
     FlowData fd = flows.get(flow);
     if (fd == null) {
@@ -218,26 +238,6 @@ public class TCPDecoder implements PacketReader {
       }
     }
 
-    // check if this is a ack for the server response
-    if (!isServer && packet.isTcpFlagAck()) {
-      // get resassembledPacket packet using client flow
-      Packet resassembledPacket = reassembledPackets.remove(packet.getFlow());
-      // check if the client ack is for the correct server response.
-      if (resassembledPacket != null) {
-        // found a resassembledPacket packet waiting to be returned, use the
-        // timestamp from the current ack packet for RTT calculation
-        // Only do this when NO RETRANSMISSIONS have been detected
-        // because we cannot now which packet the client will ack the original packet or any of the
-        // retransmissions. See: https://en.wikipedia.org/wiki/Karn%27s_algorithm
-        if (!resassembledPacket.isTcpRetransmission()
-            && resassembledPacket.nextAck() == packet.getTcpAck()) {
-          resassembledPacket
-              .setTcpPacketRtt((int) (packet.getTsMilli() - resassembledPacket.getTsMilli()));
-        }
-        return resassembledPacket;
-      }
-    }
-
     if (packet.isTcpFlagFin() && !isNextPayloadAvail(fd)) {
       // got end of tcp stream but not enough data to decode dns packet.
       // ignore the leftover data
@@ -251,10 +251,6 @@ public class TCPDecoder implements PacketReader {
 
       // if the PSH flag is set, this does not mean enough bytes ares received to
       // be able to decode the DNS data. If not enough bytes avail, wait for more packets.
-
-      if (fd == null) {
-        System.out.println("stop");
-      }
 
       if (!fd.isNextPayloadAvail()) {
         // uhoh not enough data, stop here and wait for next packet
@@ -322,6 +318,8 @@ public class TCPDecoder implements PacketReader {
           if (remainder.length > 0 && prev != null) {
             createNewFlowWithRemainer(flow, remainder, prev);
           }
+          // return decoded packet
+          return packet;
         }
       }
     }
