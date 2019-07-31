@@ -3,7 +3,7 @@
 
 	<groupId>nl.sidnlabs</groupId>
 	<artifactId>pcap-lib</artifactId>
-	<version>0.2.2-SNAPSHOT</version>
+	<version>0.2.2</version>
 
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>PCAP library</description>
@@ -29,7 +29,7 @@
 		<connection>scm:git:ssh://github.com/SIDN/pcap-lib.git</connection>
 		<developerConnection>scm:git:ssh://github.com/SIDN/pcap-lib.git</developerConnection>
 		<url>https://github.com/SIDN/pcap-lib/tree/master/</url>
-	  <tag>HEAD</tag>
+	  <tag>pcap-lib-0.2.2</tag>
   </scm>
 
 	<properties>
@@ -43,7 +43,7 @@
 		<dependency>
 			<groupId>nl.sidnlabs</groupId>
 			<artifactId>dnslib</artifactId>
-			<version>0.2.0-SNAPSHOT</version>
+			<version>0.2.0</version>
 		</dependency>
 
 
@@ -99,7 +99,9 @@
 		</dependency>
 	</dependencies>
 
-	<!-- for build and publish info see: https://central.sonatype.org/pages/apache-maven.html -->
+		<!-- for build and publish info see: https://central.sonatype.org/pages/apache-maven.html 
+		To release do the following: 1) mvn release:clean release:prepare 2) mvn 
+		release:perform -->
 	<distributionManagement>
 		<snapshotRepository>
 			<id>ossrh</id>
