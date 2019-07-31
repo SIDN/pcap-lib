@@ -38,7 +38,7 @@ public class IPv4Util {
     return packetData[ipStart + IP_TTL_OFFSET] & 0xFF;
   }
 
-  public static int decodeProtocol(byte[] packetData, int ipStart) {
+  public static byte decodeProtocol(byte[] packetData, int ipStart) {
     return packetData[ipStart + IP_PROTOCOL_OFFSET];
   }
 

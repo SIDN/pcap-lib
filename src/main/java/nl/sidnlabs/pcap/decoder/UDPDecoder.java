@@ -21,7 +21,6 @@ package nl.sidnlabs.pcap.decoder;
 
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
-import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Packet;
@@ -58,10 +57,10 @@ public class UDPDecoder implements PacketReader {
 
     packet
         .setSrcPort(
-            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
     packet
         .setDstPort(
-            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     if (!isDNS(packet)) {
       // not a dns packet
@@ -71,7 +70,7 @@ public class UDPDecoder implements PacketReader {
       return Packet.NULL;
     }
 
-    byte[] packetPayload = decode(packet, packetData);
+    byte[] packetPayload = decode(packetData);
     if (packetPayload.length == 0) {
       // no DNS packets found
       if (log.isDebugEnabled()) {
@@ -87,7 +86,7 @@ public class UDPDecoder implements PacketReader {
     return dnsDecoder.decode((DNSPacket) packet, packetPayload);
   }
 
-  public byte[] decode(Packet packet, byte[] packetData) {
+  public byte[] decode(byte[] packetData) {
     int payloadLength = packetData.length - UDPUtil.UDP_HEADER_SIZE;
     return PcapReaderUtil.readPayload(packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
   }

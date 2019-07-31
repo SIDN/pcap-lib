@@ -32,6 +32,7 @@ import nl.sidnlabs.pcap.decoder.IPDecoder;
 @Data
 public class Packet {
 
+  // special null packet indicating error or no-data situation.
   public static final Packet NULL = new Packet();
 
   // network
@@ -47,7 +48,7 @@ public class Packet {
   protected int ttl;
   protected int ipVersion;
   protected int ipHeaderLen;
-  protected short protocol;
+  protected byte protocol;
   protected String src;
   protected String dst;
   protected long fragOffset;
@@ -90,6 +91,11 @@ public class Packet {
   private TCPFlow flow;
   private TCPFlow reverseFlow;
 
+  public Packet() {}
+
+  public Packet(byte protocol) {
+    this.protocol = protocol;
+  }
 
   /**
    * Get FLOW from Client to Server

@@ -62,8 +62,6 @@ public class PcapReader {
   public static final int ETHERNET_TYPE_8021Q = 0x8100;
   public static final int SLL_HEADER_BASE_SIZE = 10; // SLL stands for Linux cooked-mode capture
   public static final int SLL_ADDRESS_LENGTH_OFFSET = 4; // relative to SLL header
-  public static final int PROTOCOL_HEADER_SRC_PORT_OFFSET = 0;
-  public static final int PROTOCOL_HEADER_DST_PORT_OFFSET = 2;
 
   public static final int PROTOCOL_FRAGMENTED = -1;
 
@@ -152,26 +150,15 @@ public class PcapReader {
       return Packet.NULL;
     }
 
-    // first create the packet so the timestamps can be added to the packet.
-    // these timestamps are needed by the protocol decoders.
-    Packet packet = ipDecoder.createPacket(packetData, ipStart);
-
-    // the pcap header for ervy packet contains a timestamp with the capture datetime of the packet
+    // the pcap header for each packet contains a timestamp with the capture time of the packet
     long packetTimestampSecs =
         PcapReaderUtil.convertInt(pcapPacketHeader, TIMESTAMP_OFFSET, reverseHeaderByteOrder);
-    packet.setTsSec(packetTimestampSecs);
     long packetTimestampMicros = PcapReaderUtil
         .convertInt(pcapPacketHeader, TIMESTAMP_MICROS_OFFSET, reverseHeaderByteOrder);
-    packet.setTsMicro(packetTimestampMicros);
-
-    // calc the timestamp in milliseconds = seconds + micros combined
-    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
 
     // decode the packet bytes
-    // the "packet" param is handed to the decode method as a parameter and
-    // will be updated with decoded values, DO NOT use this param anymore
-    // after calling IpDecoder::decode use the method result
-    Packet decodedPacket = ipDecoder.decode(packet, packetData, ipStart);
+    Packet decodedPacket =
+        ipDecoder.decode(packetData, ipStart, packetTimestampSecs, packetTimestampMicros);
 
     packetCounter++;
     return decodedPacket;

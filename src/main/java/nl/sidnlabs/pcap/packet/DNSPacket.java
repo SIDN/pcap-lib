@@ -32,6 +32,9 @@ public class DNSPacket extends Packet {
   // dns messages
   private List<Message> messages = new ArrayList<>();
 
+  public DNSPacket(byte protocol) {
+    super(protocol);
+  }
 
   /**
    * get dns message from packet

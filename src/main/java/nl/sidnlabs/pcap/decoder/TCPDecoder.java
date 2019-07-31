@@ -67,57 +67,6 @@ public class TCPDecoder implements PacketReader {
     dnsDecoder = new DNSDecoder(allowfail);
   }
 
-
-  public byte[] decode(Packet packet, byte[] packetData) {
-    packet
-        .setSrcPort(
-            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
-    packet
-        .setDstPort(
-            PcapReaderUtil.convertShort(packetData, PcapReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
-
-    int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData);
-    if (tcpOrUdpHeaderSize == -1) {
-      return new byte[0];
-    }
-    packet.setTcpHeaderLen(tcpOrUdpHeaderSize);
-
-    // Store the sequence and acknowledgement numbers --M
-    packet.setTcpSeq(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_SEQ_OFFSET));
-    packet.setTcpAck(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_ACK_OFFSET));
-    // Flags stretch two bytes starting at the TCP header offset
-    int flags = PcapReaderUtil
-        .convertShort(
-            new byte[] {packetData[TCP_HEADER_DATA_OFFSET], packetData[TCP_HEADER_DATA_OFFSET + 1]})
-        & 0x1FF; // Filter first 7 bits. First 4 are the data offset and the other 3 reserved for
-                 // future use.
-
-    packet.setTcpFlagNs((flags & 0x100) == 0 ? false : true);
-    packet.setTcpFlagCwr((flags & 0x80) == 0 ? false : true);
-    packet.setTcpFlagEce((flags & 0x40) == 0 ? false : true);
-    packet.setTcpFlagUrg((flags & 0x20) == 0 ? false : true);
-    packet.setTcpFlagAck((flags & 0x10) == 0 ? false : true);
-    packet.setTcpFlagPsh((flags & 0x8) == 0 ? false : true);
-    packet.setTcpFlagRst((flags & 0x4) == 0 ? false : true);
-    packet.setTcpFlagSyn((flags & 0x2) == 0 ? false : true);
-    packet.setTcpFlagFin((flags & 0x1) == 0 ? false : true);
-
-    // WINDOW size
-    packet
-        .setTcpWindowSize(
-            PcapReaderUtil.convertShort(packetData, PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
-
-    int payloadLength = packetData.length - tcpOrUdpHeaderSize;
-
-    byte[] data = PcapReaderUtil.readPayload(packetData, tcpOrUdpHeaderSize, payloadLength);
-
-    packet.setPayloadLength(payloadLength);
-    // total length of packet
-    packet.setLen(packetData.length);
-
-    return data;
-  }
-
   /**
    * decode the packetdata
    * 
@@ -125,6 +74,7 @@ public class TCPDecoder implements PacketReader {
    * @param packetData data to assemble
    * @return reassembled packet of NULL packet
    */
+  @Override
   public Packet reassemble(Packet packet, byte[] packetData) {
     byte[] packetPayload = decode(packet, packetData);
 
@@ -314,6 +264,56 @@ public class TCPDecoder implements PacketReader {
 
     // do not return any bytes yet to upper protocol decoder.
     return Packet.NULL;
+  }
+
+  public byte[] decode(Packet packet, byte[] packetData) {
+    packet
+        .setSrcPort(
+            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+    packet
+        .setDstPort(
+            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+
+    int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData);
+    if (tcpOrUdpHeaderSize == -1) {
+      return new byte[0];
+    }
+    packet.setTcpHeaderLen(tcpOrUdpHeaderSize);
+
+    // Store the sequence and acknowledgement numbers --M
+    packet.setTcpSeq(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_SEQ_OFFSET));
+    packet.setTcpAck(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_ACK_OFFSET));
+    // Flags stretch two bytes starting at the TCP header offset
+    int flags = PcapReaderUtil
+        .convertShort(
+            new byte[] {packetData[TCP_HEADER_DATA_OFFSET], packetData[TCP_HEADER_DATA_OFFSET + 1]})
+        & 0x1FF; // Filter first 7 bits. First 4 are the data offset and the other 3 reserved for
+                 // future use.
+
+    packet.setTcpFlagNs((flags & 0x100) == 0 ? false : true);
+    packet.setTcpFlagCwr((flags & 0x80) == 0 ? false : true);
+    packet.setTcpFlagEce((flags & 0x40) == 0 ? false : true);
+    packet.setTcpFlagUrg((flags & 0x20) == 0 ? false : true);
+    packet.setTcpFlagAck((flags & 0x10) == 0 ? false : true);
+    packet.setTcpFlagPsh((flags & 0x8) == 0 ? false : true);
+    packet.setTcpFlagRst((flags & 0x4) == 0 ? false : true);
+    packet.setTcpFlagSyn((flags & 0x2) == 0 ? false : true);
+    packet.setTcpFlagFin((flags & 0x1) == 0 ? false : true);
+
+    // WINDOW size
+    packet
+        .setTcpWindowSize(
+            PcapReaderUtil.convertShort(packetData, PROTOCOL_HEADER_WINDOW_SIZE_OFFSET));
+
+    int payloadLength = packetData.length - tcpOrUdpHeaderSize;
+
+    byte[] data = PcapReaderUtil.readPayload(packetData, tcpOrUdpHeaderSize, payloadLength);
+
+    packet.setPayloadLength(payloadLength);
+    // total length of packet
+    packet.setLen(packetData.length);
+
+    return data;
   }
 
 

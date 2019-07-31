@@ -66,15 +66,23 @@ public class IPDecoder {
   }
 
 
-  public Packet decode(byte[] packetData, int ipStart) {
-    Packet p = createPacket(packetData, ipStart);
-    return decode(p, packetData, ipStart);
-  }
-
-  public Packet decode(Packet packet, byte[] packetData, int ipStart) {
+  public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
+      long packetTimestampMicros) {
 
     if (ipStart == -1)
       return Packet.NULL;
+
+    Packet p = createPacket(packetData, ipStart);
+
+    p.setTsSec(packetTimestampSecs);
+    p.setTsMicro(packetTimestampMicros);
+    // calc the timestamp in milliseconds = seconds + micros combined
+    p.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
+
+    return decode(p, packetData, ipStart);
+  }
+
+  private Packet decode(Packet packet, byte[] packetData, int ipStart) {
 
     int ipProtocolHeaderVersion = IPv4Util.getInternetProtocolHeaderVersion(packetData, ipStart);
     packet.setIpVersion(ipProtocolHeaderVersion);
@@ -83,15 +91,19 @@ public class IPDecoder {
     if (ipProtocolHeaderVersion == IP_PROTOCOL_VERSION_4) {
       int ipHeaderLen = IPv4Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
-
-      buildInternetProtocolV4Packet(packet, packetData, ipStart);
+      packet.setTtl(IPv4Util.decodeTTL(packetData, ipStart));
+      packet.setSrc(IPv4Util.decodeSrc(packetData, ipStart));
+      packet.setDst(IPv4Util.decodeDst(packetData, ipStart));
+      packet.setIpId(IPv4Util.decodeId(packetData, ipStart));
       totalLength = PcapReaderUtil.convertShort(packetData, ipStart + IP_TOTAL_LEN_OFFSET);
       decodeV4Fragmented(packet, ipStart, packetData);
     } else {
       int ipHeaderLen = IPv6Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
-
-      buildInternetProtocolV6Packet(packet, packetData, ipStart);
+      packet.setTtl(IPv6Util.decodeTTL(packetData, ipStart));
+      packet.setSrc(IPv6Util.decodeSrc(packetData, ipStart));
+      packet.setDst(IPv6Util.decodeDst(packetData, ipStart));
+      packet.setIpId(IPv6Util.decodeId(packetData, ipStart));
       int payloadLength =
           PcapReaderUtil.convertShort(packetData, ipStart + IPv6Util.IPV6_PAYLOAD_LEN_OFFSET);
       totalLength = payloadLength + IPv6Util.IPV6_HEADER_SIZE;
@@ -106,7 +118,8 @@ public class IPDecoder {
     packet.setTotalLength(totalLength);
     // check for presence of ethernet padding, eth frames must be minumum of 64bytes
     // and eth adapters can add padding to get 64 byte packet size
-    int padding = packetData.length - (totalLength + ipStart);
+    int padding = Math.max(packetData.length - (totalLength + ipStart), 0);
+
     /*
      * Copy the IP payload into a packetData. Make sure there is no ethernet padding present. see:
      * https://wiki.wireshark.org/Ethernet padding present, copy all data except the padding, to
@@ -128,7 +141,7 @@ public class IPDecoder {
 
   public Packet createPacket(byte[] packetData, int ipStart) {
     int ipProtocolHeaderVersion = IPv4Util.getInternetProtocolHeaderVersion(packetData, ipStart);
-    int protocol = -1;
+    byte protocol = -1;
 
     if (ipProtocolHeaderVersion == IP_PROTOCOL_VERSION_4) {
       protocol = IPv4Util.decodeProtocol(packetData, ipStart);
@@ -145,12 +158,12 @@ public class IPDecoder {
 
     if ((PacketFactory.PROTOCOL_ICMP_V4 == packet.getProtocol())
         || (PacketFactory.PROTOCOL_ICMP_V6 == packet.getProtocol())) {
+
       // found icmp protocol
-      ICMPPacket icmpPacket = (ICMPPacket) packet;
-      icmpDecoder.reassemble(icmpPacket, packetData);
+      icmpDecoder.reassemble((ICMPPacket) packet, packetData);
       // do not process icmp packet further, because the dns packet might be corrupt (only 8 bytes
       // in icmp packet)
-      return icmpPacket;
+      return packet;
     }
 
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
@@ -161,8 +174,7 @@ public class IPDecoder {
       udpReader.reassemble(packet, packetData);
     }
 
-    if (packet == Packet.NULL
-        || (packet instanceof DNSPacket && ((DNSPacket) packet).getMessageCount() == 0)) {
+    if (packet instanceof DNSPacket && ((DNSPacket) packet).getMessageCount() == 0) {
       // no dns message(s) found
       return Packet.NULL;
     }
@@ -190,22 +202,6 @@ public class IPDecoder {
       packet.setFragmented(false);
     }
   }
-
-
-  private void buildInternetProtocolV4Packet(Packet packet, byte[] packetData, int ipStart) {
-    packet.setTtl(IPv4Util.decodeTTL(packetData, ipStart));
-    packet.setSrc(IPv4Util.decodeSrc(packetData, ipStart));
-    packet.setDst(IPv4Util.decodeDst(packetData, ipStart));
-    packet.setIpId(IPv4Util.decodeId(packetData, ipStart));
-  }
-
-  private void buildInternetProtocolV6Packet(Packet packet, byte[] packetData, int ipStart) {
-    packet.setTtl(IPv6Util.decodeTTL(packetData, ipStart));
-    packet.setSrc(IPv6Util.decodeSrc(packetData, ipStart));
-    packet.setDst(IPv6Util.decodeDst(packetData, ipStart));
-    packet.setIpId(IPv6Util.decodeId(packetData, ipStart));
-  }
-
 
   /**
    * Reassemble the IP packet is it is fragmented. If it is not fragmented then the packetData bytes

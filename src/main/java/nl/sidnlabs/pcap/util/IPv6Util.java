@@ -40,8 +40,8 @@ public class IPv6Util {
   public static final int IPV6_MFLAG_OFFSET = 3;
   public static final int IPV6_ID_OFFSET = 4;
 
-  public static int decodeProtocol(byte[] packetData, int ipStart) {
-    int protocol = packetData[ipStart + IPV6_NEXTHEADER_OFFSET];
+  public static byte decodeProtocol(byte[] packetData, int ipStart) {
+    byte protocol = packetData[ipStart + IPV6_NEXTHEADER_OFFSET];
     if (protocol == IPV6_FRAGMENT_EXTENTION_TYPE) {
       // fragment header founf, get actual proto from the header
       protocol = packetData[ipStart + IPV6_HEADER_SIZE];
@@ -99,8 +99,8 @@ public class IPv6Util {
 
       packet.setLastFragment(((flags & 0x1) == 0 && fragmentOffset != 0));
 
-      int protocol = packetData[ipStart + IPV6_HEADER_SIZE];
-      packet.setProtocol((short) protocol); // Change protocol to value from fragment header
+      // Change protocol to value from fragment header
+      packet.setProtocol(packetData[ipStart + IPV6_HEADER_SIZE]);
 
       return IPV6_FRAGMENT_EXTENTION_SIZE; // Return fragment header extension length
     }

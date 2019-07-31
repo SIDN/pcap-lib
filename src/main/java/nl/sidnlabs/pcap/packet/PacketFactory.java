@@ -32,18 +32,14 @@ public class PacketFactory {
 
   private PacketFactory() {}
 
-  public static Packet create(int protocol) {
-    Packet p = null;
+  public static Packet create(byte protocol) {
     if ((protocol == PROTOCOL_ICMP_V4) || (protocol == PROTOCOL_ICMP_V6)) {
-      p = new ICMPPacket();
+      return new ICMPPacket(protocol);
     } else if ((protocol == PROTOCOL_UDP) || (protocol == PROTOCOL_TCP)) {
-      p = new DNSPacket();
+      return new DNSPacket(protocol);
     } else {
       return Packet.NULL;
     }
-
-    p.setProtocol((short) protocol);
-    return p;
   }
 
 }

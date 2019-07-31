@@ -5,6 +5,9 @@ import nl.sidnlabs.pcap.packet.Packet;
 
 public interface PacketReader {
 
+  int PROTOCOL_HEADER_SRC_PORT_OFFSET = 0;
+  int PROTOCOL_HEADER_DST_PORT_OFFSET = 2;
+
   Packet reassemble(Packet packet, byte[] packetData);
 
   default boolean isDNS(Packet packet) {

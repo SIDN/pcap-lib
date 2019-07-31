@@ -51,7 +51,7 @@ public class DNSDecoder {
       // decode the message use partial == true
       // this will save of lot of objects from getting created
       // and this results in less garbage collection delays
-      dnsPacket.pushMessage(new Message(new NetworkData(payload), true));
+      dnsPacket.pushMessage(new Message(new NetworkData(payload), true, allowFail));
       messageCounter++;
     } catch (Exception e) {
       if (!allowFail) {
