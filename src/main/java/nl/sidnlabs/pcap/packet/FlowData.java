@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
-import nl.sidnlabs.pcap.SequencePayload;
 
 @Log4j2
 @Data

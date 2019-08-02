@@ -3,7 +3,7 @@ package nl.sidnlabs.pcap.decoder;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.packet.Packet;
 
-public interface PacketReader {
+public interface Decoder {
 
   int PROTOCOL_HEADER_SRC_PORT_OFFSET = 0;
   int PROTOCOL_HEADER_DST_PORT_OFFSET = 2;

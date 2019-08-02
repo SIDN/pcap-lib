@@ -94,10 +94,11 @@ public class PcapReader {
     if (!validateMagicNumber(pcapHeader))
       throw new IOException("Not a PCAP file (Couldn't find magic number)");
 
-    long linkTypeVal =
-        PcapReaderUtil.convertInt(pcapHeader, PCAP_HEADER_LINKTYPE_OFFSET, reverseHeaderByteOrder);
-    if ((linkType = getLinkType(linkTypeVal)) == null)
-      throw new IOException("Unsupported link type: " + linkTypeVal);
+    linkType = getLinkType(
+        PcapReaderUtil.convertInt(pcapHeader, PCAP_HEADER_LINKTYPE_OFFSET, reverseHeaderByteOrder));
+    if (linkType == null) {
+      throw new IOException("Unsupported link type");
+    }
   }
 
   public Stream<Packet> stream() {
@@ -216,10 +217,8 @@ public class PcapReader {
       case LOOP:
         return 4;
       case LINUX_SLL:
-        start = SLL_HEADER_BASE_SIZE;
-        int sllAddressLength = PcapReaderUtil.convertShort(packet, SLL_ADDRESS_LENGTH_OFFSET);
-        start += sllAddressLength;
-        return start;
+        return SLL_HEADER_BASE_SIZE
+            + PcapReaderUtil.convertShort(packet, SLL_ADDRESS_LENGTH_OFFSET);
     }
     return -1;
   }

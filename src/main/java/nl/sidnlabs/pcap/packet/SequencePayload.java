@@ -17,12 +17,11 @@
  * not, see [<http://www.gnu.org/licenses/].
  *
  */
-package nl.sidnlabs.pcap;
+package nl.sidnlabs.pcap.packet;
 
 import com.google.common.collect.ComparisonChain;
 import lombok.Data;
 import lombok.ToString;
-import nl.sidnlabs.pcap.packet.TCPFlow;
 
 /**
  * Class for re-assembly of TCP fragments

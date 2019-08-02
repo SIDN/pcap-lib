@@ -30,22 +30,26 @@ import lombok.Data;
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
-import nl.sidnlabs.pcap.SequencePayload;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.Packet;
+import nl.sidnlabs.pcap.packet.SequencePayload;
 import nl.sidnlabs.pcap.packet.TCPFlow;
 import nl.sidnlabs.pcap.packet.TcpHandshake;
 import nl.sidnlabs.pcap.packet.TcpHandshake.HANDSHAKE_STATE;
 
 @Data
 @Log4j2
-public class TCPDecoder implements PacketReader {
+public class TCPDecoder implements Decoder {
 
   private static final int PROTOCOL_HEADER_TCP_SEQ_OFFSET = 4;
   private static final int PROTOCOL_HEADER_TCP_ACK_OFFSET = 8;
   private static final int TCP_HEADER_DATA_OFFSET = 12;
   private static final int PROTOCOL_HEADER_WINDOW_SIZE_OFFSET = 14;
+  private static final int PROTOCOL_HEADER_OPTIONS_OFFSET = 20;
+  // last 5 bits of the 1st byte of the option are for the option number
+  private static final int PROTOCOL_HEADER_OPTION_LEN_MASK = 0b00011111;
+  private static final int PROTOCOL_HEADER_OPTION_TIMESTAMP = 8;
 
   private static final int TCP_DNS_LENGTH_PREFIX = 2;
 
@@ -269,10 +273,10 @@ public class TCPDecoder implements PacketReader {
   public byte[] decode(Packet packet, byte[] packetData) {
     packet
         .setSrcPort(
-            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, Decoder.PROTOCOL_HEADER_SRC_PORT_OFFSET));
     packet
         .setDstPort(
-            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, Decoder.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData);
     if (tcpOrUdpHeaderSize == -1) {
@@ -313,7 +317,52 @@ public class TCPDecoder implements PacketReader {
     // total length of packet
     packet.setLen(packetData.length);
 
+    // decodeOptions(packet, packetData, tcpOrUdpHeaderSize);
     return data;
+  }
+
+  // /**
+  // * try to locate and decode the timestamp option
+  // *
+  // * @param packet the current packet
+  // * @param packetData the current packet data
+  // * @param tcpHeaderSize the tcp header size
+  // */
+  // private void decodeOptions(Packet packet, byte[] packetData, int tcpHeaderSize) {
+  // if (tcpHeaderSize > PROTOCOL_HEADER_OPTIONS_OFFSET) {
+  // // tcp header is > 20 bytes, meanign there are tcp options present
+  // int pos = PROTOCOL_HEADER_OPTIONS_OFFSET;
+  // int option = -1;
+  // // scan through options until reached end of options or end-options found or
+  // // timestamp options found
+  // while (pos < tcpHeaderSize && option != 0) {
+  // option = PROTOCOL_HEADER_OPTION_LEN_MASK & (0xFF & packetData[pos++]);
+  // // option 0 and 1 do not have length field
+  // if (option > 1) {
+  // int len = 0xFF & packetData[pos++];
+  // if (option == PROTOCOL_HEADER_OPTION_TIMESTAMP) {
+  // byte[] ts = new byte[4];
+  // System.arraycopy(packetData, pos, ts, 0, ts.length);
+  // packet.setTcpOptionTSval(readUnsignedInt(ts));
+  // System.arraycopy(packetData, pos + 4, ts, 0, ts.length);
+  // packet.setTcpOptionTSecr(readUnsignedInt(ts));
+  // // stop processing options, only interested in the TS option
+  // break;
+  // }
+  // // goto to next option postion
+  // pos += (len - 2);
+  // }
+  // }
+  // }
+  // }
+
+  public long readUnsignedInt(byte[] buf) {
+    int byte1 = (0xFF & buf[0]);
+    int byte2 = (0xFF & buf[1]);
+    int byte3 = (0xFF & buf[2]);
+    int byte4 = (0xFF & buf[3]);
+
+    return ((long) (byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)) & 0xFFFFFFFFL;
   }
 
 

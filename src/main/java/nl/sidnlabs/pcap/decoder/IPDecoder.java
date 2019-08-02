@@ -54,12 +54,12 @@ public class IPDecoder {
 
   private Multimap<Datagram, DatagramPayload> datagrams = TreeMultimap.create();
 
-  private PacketReader tcpReader;
-  private PacketReader udpReader;
+  private Decoder tcpReader;
+  private Decoder udpReader;
   private ICMPDecoder icmpDecoder;
 
 
-  public IPDecoder(PacketReader tcpReader, PacketReader udpReader, ICMPDecoder icmpDecoder) {
+  public IPDecoder(Decoder tcpReader, Decoder udpReader, ICMPDecoder icmpDecoder) {
     this.tcpReader = tcpReader;
     this.udpReader = udpReader;
     this.icmpDecoder = icmpDecoder;

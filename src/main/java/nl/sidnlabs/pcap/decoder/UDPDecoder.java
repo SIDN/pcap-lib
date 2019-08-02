@@ -32,7 +32,7 @@ import nl.sidnlabs.pcap.util.UDPUtil;
  */
 @Log4j2
 @Data
-public class UDPDecoder implements PacketReader {
+public class UDPDecoder implements Decoder {
 
   private DNSDecoder dnsDecoder;
 
@@ -57,10 +57,10 @@ public class UDPDecoder implements PacketReader {
 
     packet
         .setSrcPort(
-            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_SRC_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, Decoder.PROTOCOL_HEADER_SRC_PORT_OFFSET));
     packet
         .setDstPort(
-            PcapReaderUtil.convertShort(packetData, PacketReader.PROTOCOL_HEADER_DST_PORT_OFFSET));
+            PcapReaderUtil.convertShort(packetData, Decoder.PROTOCOL_HEADER_DST_PORT_OFFSET));
 
     if (!isDNS(packet)) {
       // not a dns packet
