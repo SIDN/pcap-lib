@@ -73,6 +73,7 @@ public class PcapReader {
 
   // metrics
   private int packetCounter;
+  private int reassmbledPacketCounter;
 
   private TCPDecoder tcpDecoder = new TCPDecoder();
   private IPDecoder ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
@@ -138,8 +139,9 @@ public class PcapReader {
         PcapReaderUtil.convertInt(pcapPacketHeader, CAP_LEN_OFFSET, reverseHeaderByteOrder);
     byte[] packetData = new byte[(int) packetSize];
 
-    if (!readBytes(packetData))
+    if (!readBytes(packetData)) {
       return Packet.NULL;
+    }
 
     // find the start pos of the ip packet in the pcap frame
     int ipStart = findIPStart(packetData);
@@ -228,11 +230,12 @@ public class PcapReader {
   protected boolean readBytes(byte[] buf) {
     try {
       is.readFully(buf);
-      return true;
     } catch (IOException e) {
       log.error("Error while reading " + buf.length + " bytes from buffer");
       return false;
     }
+
+    return true;
   }
 
   public Map<TCPFlow, FlowData> getFlows() {
@@ -248,6 +251,13 @@ public class PcapReader {
 
     private void fetchNext() {
       if (next == null) {
+        // 1st check if reassembled response is available
+        if (tcpDecoder.hasReassembledPackets()) {
+          next = tcpDecoder.getNextReassmbledPacket();
+          reassmbledPacketCounter++;
+          return;
+        }
+
         // skip fragmented packets until they are assembled
         do {
           try {
@@ -268,11 +278,18 @@ public class PcapReader {
       if (next != null)
         return true;
 
+      // there might still be a reassembled packet in the tcpdecoder waiting to
+      // be fetched.
+      if (tcpDecoder.hasReassembledPackets()) {
+        return true;
+      }
+
       // no more data left
       int remainingFlows = tcpDecoder.getFlows().size() + ipDecoder.getDatagrams().size();
       if (remainingFlows > 0) {
         log.warn("Still " + remainingFlows + " flows queued. Missing packets to finish assembly?");
         log.warn("Packets processed: " + packetCounter);
+        log.warn("Reassembled response packets: " + reassmbledPacketCounter);
       }
 
       return false;
@@ -285,6 +302,7 @@ public class PcapReader {
       if (next == null) {
         throw new NoSuchElementException("No more packets to decode");
       }
+
       try {
         return next;
       } finally {

@@ -168,10 +168,10 @@ public class IPDecoder {
 
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
       // found TCP protocol
-      tcpReader.reassemble(packet, packetData);
+      packet = tcpReader.reassemble(packet, packetData);
     } else if (PacketFactory.PROTOCOL_UDP == packet.getProtocol()) {
       // found UDP protocol
-      udpReader.reassemble(packet, packetData);
+      packet = udpReader.reassemble(packet, packetData);
     }
 
     if (packet instanceof DNSPacket && ((DNSPacket) packet).getMessageCount() == 0) {
