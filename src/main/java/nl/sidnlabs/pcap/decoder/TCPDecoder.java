@@ -262,7 +262,7 @@ public class TCPDecoder implements Decoder {
           }
 
           if (remainder.length > 0 && prev != null) {
-            createNewFlowWithRemainer(flow, remainder, prev, fd.getLastSize());
+            createNewFlowWithRemainder(flow, remainder, prev, fd.getLastSize());
           }
 
           if (packet != Packet.NULL) {
@@ -301,7 +301,7 @@ public class TCPDecoder implements Decoder {
           }
 
           if (remainder.length > 0 && prev != null) {
-            createNewFlowWithRemainer(flow, remainder, prev, fd.getLastSize());
+            createNewFlowWithRemainder(flow, remainder, prev, fd.getLastSize());
           }
 
           // return decoded packet
@@ -451,7 +451,7 @@ public class TCPDecoder implements Decoder {
    * @param lastPayload the last sequence, this will become the 1st sequence now
    * @param lastSize the payload size of the last packet
    */
-  private void createNewFlowWithRemainer(TCPFlow flow, byte[] remainder,
+  private void createNewFlowWithRemainder(TCPFlow flow, byte[] remainder,
       SequencePayload lastPayload, long lastSize) {
     // set the remaining bytes as last payload
     lastPayload.setBytes(remainder);
