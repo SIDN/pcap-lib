@@ -31,6 +31,9 @@ public class Datagram implements Comparable<Datagram> {
   private String protocol;
   private long time;
 
+  /** no-arg constructor for Kryo **/
+  public Datagram() {}
+
   public Datagram(String src, String dst, long id, String protocol, long time) {
     this.src = src;
     this.dst = dst;

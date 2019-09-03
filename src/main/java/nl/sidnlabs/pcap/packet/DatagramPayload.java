@@ -30,6 +30,10 @@ public class DatagramPayload implements Comparable<DatagramPayload> {
   @ToString.Exclude
   private byte[] payload;
 
+
+  /** no-arg constructor for Kryo **/
+  public DatagramPayload() {}
+
   public DatagramPayload(Long offset, byte[] payload) {
     this.offset = offset;
     this.payload = payload;
