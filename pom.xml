@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>nl.sidnlabs</groupId>
@@ -29,8 +31,8 @@
 		<connection>scm:git:ssh://github.com/SIDN/pcap-lib.git</connection>
 		<developerConnection>scm:git:ssh://github.com/SIDN/pcap-lib.git</developerConnection>
 		<url>https://github.com/SIDN/pcap-lib/tree/master/</url>
-	  <tag>HEAD</tag>
-  </scm>
+		<tag>HEAD</tag>
+	</scm>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -43,7 +45,7 @@
 		<dependency>
 			<groupId>nl.sidnlabs</groupId>
 			<artifactId>dnslib</artifactId>
-			<version>0.2.8</version>
+			<version>0.2.9-SNAPSHOT</version>
 		</dependency>
 
 
@@ -86,9 +88,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.17</version>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
+			<version>2.13.0</version>
 		</dependency>
 
 		<!-- this is required but not directly used -->
@@ -99,7 +101,7 @@
 		</dependency>
 	</dependencies>
 
-		<!-- for build and publish info see: https://central.sonatype.org/pages/apache-maven.html 
+	<!-- for build and publish info see: https://central.sonatype.org/pages/apache-maven.html 
 		To release do the following: 1) mvn release:clean release:prepare 2) mvn 
 		release:perform -->
 	<distributionManagement>
