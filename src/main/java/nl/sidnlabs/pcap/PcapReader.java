@@ -20,6 +20,7 @@
 package nl.sidnlabs.pcap;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
@@ -67,6 +68,7 @@ public class PcapReader {
 
   private DataInputStream is;
   private LinkType linkType;
+  private boolean caughtEOF = false;
 
   // To read reversed-endian PCAPs; the header is the only part that switches
   private boolean reverseHeaderByteOrder = false;
@@ -89,6 +91,10 @@ public class PcapReader {
       // PcapReader to barf on an empty file. This is the only
       // place we check caughtEOF.
       //
+      if (caughtEOF) {
+        log.warn("Skipping empty file");
+        return;
+      }
       throw new IOException("Couldn't read PCAP header");
     }
 
@@ -230,6 +236,10 @@ public class PcapReader {
   protected boolean readBytes(byte[] buf) {
     try {
       is.readFully(buf);
+    } catch (EOFException e) {
+      // Reached the end of the stream
+      caughtEOF = true;
+      return false;
     } catch (IOException e) {
       log.error("Error while reading " + buf.length + " bytes from buffer");
       return false;
