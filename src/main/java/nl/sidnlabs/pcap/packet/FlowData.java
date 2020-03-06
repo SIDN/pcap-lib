@@ -9,7 +9,6 @@ import lombok.Data;
 @Data
 public class FlowData {
 
-  // private int nextDnsMsgLen;
   private int bytesAvail;
 
   private long lastSequence;
@@ -41,12 +40,6 @@ public class FlowData {
   public List<SequencePayload> getSortedPayloads() {
     return payloads.stream().sorted().collect(Collectors.toList());
   }
-
-  // public boolean isNextPayloadAvail__() {
-  // // check if we have enough bytes received for the next dns message
-  // // add 2 bytes for the dns msg size prefix
-  // return bytesAvail >= (nextDnsMsgLen + 2);
-  // }
 
   public boolean isMinPayloadAvail() {
     // check if we have enough bytes received for the next dns message
