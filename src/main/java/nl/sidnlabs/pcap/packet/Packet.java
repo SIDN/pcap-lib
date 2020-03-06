@@ -85,8 +85,8 @@ public class Packet {
   protected TcpHandshake tcpHandshake;
   // time in millis between time packet was sent by server
   // and when ack for packet was received in case of TCP use( tsSec + tsmicros)
-  protected int tcpPacketRtt = -1;
-  private boolean tcpRetransmission;
+  // protected int tcpPacketRtt = -1;
+  // private boolean tcpRetransmission;
 
   private TCPFlow flow;
   private TCPFlow reverseFlow;
@@ -136,9 +136,9 @@ public class Packet {
     return getIpVersion() == IPDecoder.IP_PROTOCOL_VERSION_6;
   }
 
-  public boolean hasPacketRtt() {
-    return tcpPacketRtt != -1;
-  }
+  // public boolean hasPacketRtt() {
+  // return tcpPacketRtt != -1;
+  // }
 
   /**
    * Calculate next sequence number

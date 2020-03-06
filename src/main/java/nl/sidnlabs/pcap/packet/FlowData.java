@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class FlowData {
 
-  private int nextDnsMsgLen;
+  // private int nextDnsMsgLen;
   private int bytesAvail;
 
   private long lastSequence;
@@ -42,11 +42,19 @@ public class FlowData {
     return payloads.stream().sorted().collect(Collectors.toList());
   }
 
-  public boolean isNextPayloadAvail() {
+  // public boolean isNextPayloadAvail__() {
+  // // check if we have enough bytes received for the next dns message
+  // // add 2 bytes for the dns msg size prefix
+  // return bytesAvail >= (nextDnsMsgLen + 2);
+  // }
+
+  public boolean isMinPayloadAvail() {
     // check if we have enough bytes received for the next dns message
     // add 2 bytes for the dns msg size prefix
-    return bytesAvail >= (nextDnsMsgLen + 2);
+    return bytesAvail > 2;
   }
+
+
 
   public long getNextExpectedSequence() {
     return lastSequence + lastSize;

@@ -75,7 +75,7 @@ public class PcapReader {
 
   // metrics
   private int packetCounter;
-  private int reassmbledPacketCounter;
+  private int reassembledPacketCounter;
 
   private TCPDecoder tcpDecoder = new TCPDecoder();
   private IPDecoder ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
@@ -262,11 +262,11 @@ public class PcapReader {
     private void fetchNext() {
       if (next == null) {
         // 1st check if reassembled response is available
-        if (tcpDecoder.hasReassembledPackets()) {
-          next = tcpDecoder.getNextReassmbledPacket();
-          reassmbledPacketCounter++;
-          return;
-        }
+        // if (tcpDecoder.hasReassembledPackets()) {
+        // next = tcpDecoder.getNextReassmbledPacket();
+        // reassembledPacketCounter++;
+        // return;
+        // }
 
         // skip fragmented packets until they are assembled
         do {
@@ -288,18 +288,18 @@ public class PcapReader {
       if (next != null)
         return true;
 
-      // there might still be a reassembled packet in the tcpdecoder waiting to
-      // be fetched.
-      if (tcpDecoder.hasReassembledPackets()) {
-        return true;
-      }
+      // // there might still be a reassembled packet in the tcpdecoder waiting to
+      // // be fetched.
+      // if (tcpDecoder.hasReassembledPackets()) {
+      // return true;
+      // }
 
       // no more data left
       int remainingFlows = tcpDecoder.getFlows().size() + ipDecoder.getDatagrams().size();
       if (remainingFlows > 0) {
         log.warn("Still " + remainingFlows + " flows queued. Missing packets to finish assembly?");
         log.warn("Packets processed: " + packetCounter);
-        log.warn("Reassembled response packets: " + reassmbledPacketCounter);
+        log.warn("Reassembled response packets: " + reassembledPacketCounter);
       }
 
       return false;
