@@ -3,7 +3,7 @@
 
 	<groupId>nl.sidnlabs</groupId>
 	<artifactId>pcap-lib</artifactId>
-	<version>0.2.12</version>
+	<version>0.2.13-SNAPSHOT</version>
 
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>PCAP library</description>
@@ -29,7 +29,7 @@
 		<connection>scm:git:ssh://github.com/SIDN/pcap-lib.git</connection>
 		<developerConnection>scm:git:ssh://github.com/SIDN/pcap-lib.git</developerConnection>
 		<url>https://github.com/SIDN/pcap-lib/tree/master/</url>
-		<tag>pcap-lib-0.2.12</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<properties>
