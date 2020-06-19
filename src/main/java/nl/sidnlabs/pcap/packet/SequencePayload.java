@@ -21,6 +21,7 @@ package nl.sidnlabs.pcap.packet;
 
 import com.google.common.collect.ComparisonChain;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /**
@@ -30,7 +31,10 @@ import lombok.ToString;
 @Data
 public class SequencePayload implements Comparable<SequencePayload> {
   private Long seq;
+  // do not use the actual payload bytes to create string rep and to calc the hash
+  // this takes too much cpu resources
   @ToString.Exclude
+  @EqualsAndHashCode.Exclude
   private byte[] bytes;
   private long time;
   private long nextSequence;
