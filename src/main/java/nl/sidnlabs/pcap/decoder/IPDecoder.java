@@ -193,14 +193,18 @@ public class IPDecoder {
         (PcapReaderUtil.convertShort(packetData, ipStart + IP_FRAGMENT_OFFSET) & 0x1FFF) * 8L;
     packet.setFragOffset(fragmentOffset);
 
+    // get flag bits from ip header
     int flags = packetData[ipStart + IP_FLAGS] & 0xE0;
 
-    if ((flags & 0x20) != 0 || fragmentOffset != 0) {
+    if ((flags & 0x40) == 0x40) {
+      // bit 1 of flags is set
+      packet.setDoNotFragment(true);
+    } else if ((flags & 0x20) == 0x20 || fragmentOffset != 0) {
+      // bit 2 of flags is set
       packet.setFragmented(true);
       packet.setLastFragment(((flags & 0x20) == 0 && fragmentOffset != 0));
-    } else {
-      packet.setFragmented(false);
     }
+
   }
 
   /**

@@ -34,6 +34,8 @@ public class ICMPPacket extends Packet {
   private boolean info;
   private int clientType;
 
+  private int mtu;
+
   public ICMPPacket(byte protocol) {
     super(protocol);
   }

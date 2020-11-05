@@ -54,6 +54,7 @@ public class Packet {
   protected long fragOffset;
   protected boolean fragmented;
   protected boolean lastFragment;
+  protected boolean doNotFragment;
   // ip fragments
   protected int reassembledFragments;
   // ipv6
