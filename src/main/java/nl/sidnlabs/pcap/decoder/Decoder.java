@@ -14,4 +14,6 @@ public interface Decoder {
     return packet.getSrcPort() == PcapReader.DNS_PORT || packet.getDstPort() == PcapReader.DNS_PORT;
   }
 
+  void printStats();
+
 }

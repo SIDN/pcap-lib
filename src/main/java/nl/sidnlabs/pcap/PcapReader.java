@@ -77,12 +77,17 @@ public class PcapReader {
   private int packetCounter;
   private int reassembledPacketCounter;
 
-  private TCPDecoder tcpDecoder = new TCPDecoder();
-  private IPDecoder ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
+  private TCPDecoder tcpDecoder = null;
+  private IPDecoder ipDecoder = null;
 
-  public PcapReader(DataInputStream is) throws IOException {
+  public PcapReader(DataInputStream is, boolean tcpEnabled) throws IOException {
     log.info("Create new PCAP reader");
     this.is = is;
+
+    if (tcpEnabled) {
+      tcpDecoder = new TCPDecoder();
+    }
+    ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
     if (!readBytes(pcapHeader)) {
@@ -122,10 +127,16 @@ public class PcapReader {
    */
   public void clearCache(int tcpCacheTTL, int ipCacheTTL) {
     ipDecoder.clearCache(ipCacheTTL);
-    tcpDecoder.clearCache(tcpCacheTTL);
+    if (tcpDecoder != null) {
+      tcpDecoder.clearCache(tcpCacheTTL);
+    }
   }
 
   public void close() {
+
+    // print stats
+    ipDecoder.printStats();
+
     try {
       is.close();
     } catch (IOException e) {
@@ -249,11 +260,16 @@ public class PcapReader {
   }
 
   public Map<TCPFlow, FlowData> getFlows() {
-    return tcpDecoder.getFlows();
+    if (tcpDecoder != null) {
+      return tcpDecoder.getFlows();
+    }
+    return null;
   }
 
   public void setFlows(Map<TCPFlow, FlowData> flows) {
-    tcpDecoder.setFlows(flows);
+    if (tcpDecoder != null) {
+      tcpDecoder.setFlows(flows);
+    }
   }
 
   private class PacketIterator implements Iterator<Packet> {
@@ -295,7 +311,8 @@ public class PcapReader {
       // }
 
       // no more data left
-      int remainingFlows = tcpDecoder.getFlows().size() + ipDecoder.getDatagrams().size();
+      int remainingFlows =
+          tcpDecoder != null ? tcpDecoder.getFlows().size() : 0 + ipDecoder.getDatagrams().size();
       if (remainingFlows > 0) {
         log.warn("Still " + remainingFlows + " flows queued. Missing packets to finish assembly?");
         log.warn("Packets processed: " + packetCounter);

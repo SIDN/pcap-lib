@@ -22,6 +22,7 @@ package nl.sidnlabs.pcap;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 
@@ -130,5 +131,46 @@ public class PcapReaderUtil {
     byte[] data = new byte[payloadLength];
     System.arraycopy(packetData, payloadDataStart, data, 0, payloadLength);
     return data;
+  }
+
+  private static ByteBuffer reset(ByteBuffer buff, int limit) {
+    buff.rewind();
+    buff.limit(0);
+    return buff;
+  }
+
+
+  public static ByteBuffer readPayloadToBuffer(byte[] packetData, int payloadDataStart,
+      int payloadLength, ByteBuffer outBuffer) {
+    if (payloadLength < 0) {
+      log.warn("Malformed packet - negative payload length. Returning empty payload.");
+      return reset(outBuffer, 0);
+    }
+    if (payloadDataStart > packetData.length) {
+      log
+          .warn("Payload start (" + payloadDataStart + ") is larger than packet data ("
+              + packetData.length + "). Returning empty payload.");
+      return reset(outBuffer, 0);
+    }
+    if (payloadDataStart + payloadLength > packetData.length) {
+      payloadLength = packetData.length - payloadDataStart;
+    }
+
+    if (payloadLength == 0) {
+      return reset(outBuffer, 0);
+    } else if (outBuffer.capacity() >= payloadLength) {
+      // reuse buffer
+      outBuffer.limit(payloadLength);
+      outBuffer.position(0);
+      outBuffer.put(packetData, payloadDataStart, payloadLength);
+      outBuffer.rewind();
+      return outBuffer;
+    } else {
+      // existing buffer too small, create new
+      ByteBuffer out = ByteBuffer.allocate(payloadLength);
+      out.put(packetData, payloadDataStart, payloadLength);
+      out.rewind();
+      return out;
+    }
   }
 }

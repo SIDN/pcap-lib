@@ -9,8 +9,6 @@ import lombok.Data;
 @Data
 public class FlowData {
 
-  private int bytesAvail;
-
   private long lastSequence;
   private long lastSize;
 
@@ -29,7 +27,7 @@ public class FlowData {
     lastSequence = p.getSeq().longValue();
     // do not update the lastSize when adding partial data
     // otherwise matching retransmission based on next expected seq will fail
-    lastSize = p.getBytes().length;
+    lastSize = p.size();
   }
 
 
@@ -41,16 +39,35 @@ public class FlowData {
     return payloads.stream().sorted().collect(Collectors.toList());
   }
 
+  public List<SequencePayload> getPayloads() {
+    return payloads.stream().collect(Collectors.toList());
+  }
+
   public boolean isMinPayloadAvail() {
     // check if we have enough bytes received for the next dns message
     // add 2 bytes for the dns msg size prefix
-    return bytesAvail > 2;
+
+    for (SequencePayload p : payloads) {
+      if (p.size() > 2) {
+        return true;
+      }
+    }
+
+    return false;
+
   }
-
-
 
   public long getNextExpectedSequence() {
     return lastSequence + lastSize;
+  }
+
+  public int getBytesAvail() {
+    int sum = 0;
+    for (SequencePayload p : payloads) {
+      sum += p.size();
+    }
+
+    return sum;
   }
 
 }

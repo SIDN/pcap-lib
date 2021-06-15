@@ -44,14 +44,14 @@ public class DNSDecoder {
     this.allowFail = allowFail;
   }
 
-  public Packet decode(Packet packet, byte[] payload) {
+  public Packet decode(Packet packet, byte[] payload, int length) {
 
     DNSPacket dnsPacket = (DNSPacket) packet;
     try {
       // decode the message use partial == true
       // this will save of lot of objects from getting created
       // and this results in less garbage collection delays
-      dnsPacket.pushMessage(new Message(new NetworkData(payload), true, allowFail));
+      dnsPacket.pushMessage(new Message(new NetworkData(payload, length), true, allowFail));
       messageCounter++;
     } catch (Exception e) {
       if (!allowFail) {

@@ -65,6 +65,13 @@ public class IPDecoder {
     this.icmpDecoder = icmpDecoder;
   }
 
+  public void printStats() {
+    udpReader.printStats();
+    if (tcpReader != null) {
+      tcpReader.printStats();
+    }
+    icmpDecoder.printStats();
+  }
 
   public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
       long packetTimestampMicros) {
@@ -168,6 +175,10 @@ public class IPDecoder {
 
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
       // found TCP protocol
+      if (tcpReader == null) {
+        // tcp not enabled
+        return Packet.NULL;
+      }
       packet = tcpReader.reassemble(packet, packetData);
     } else if (PacketFactory.PROTOCOL_UDP == packet.getProtocol()) {
       // found UDP protocol

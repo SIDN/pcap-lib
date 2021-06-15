@@ -35,6 +35,7 @@ import nl.sidnlabs.pcap.util.UDPUtil;
 public class UDPDecoder implements Decoder {
 
   private DNSDecoder dnsDecoder;
+  private int packetCounter = 0;
 
   public UDPDecoder() {
     this(false);
@@ -54,6 +55,7 @@ public class UDPDecoder implements Decoder {
    */
   @Override
   public Packet reassemble(Packet packet, byte[] packetData) {
+    packetCounter++;
 
     packet
         .setSrcPort(
@@ -83,11 +85,18 @@ public class UDPDecoder implements Decoder {
     packet.setLen(packetData.length);
     packet.setPayloadLength(UDPUtil.getUdpLen(packetData));
 
-    return dnsDecoder.decode((DNSPacket) packet, packetPayload);
+    return dnsDecoder.decode((DNSPacket) packet, packetPayload, packetPayload.length);
   }
 
   public byte[] decode(byte[] packetData) {
     int payloadLength = packetData.length - UDPUtil.UDP_HEADER_SIZE;
     return PcapReaderUtil.readPayload(packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
+  }
+
+
+  public void printStats() {
+    log.info("------------- UDP stats ----------------------------");
+    log.info("packetCounter: {}", packetCounter);
+    log.info("----------------------------------------------------");
   }
 }
