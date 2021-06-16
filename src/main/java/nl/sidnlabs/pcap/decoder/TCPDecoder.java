@@ -536,16 +536,42 @@ public class TCPDecoder implements Decoder {
      * blocks, every dns msg has a 2 byte msg prefix need at least the 2 byte len prefix to start.
      */
 
-    while ((buffer.position() + TCPDecoder.TCP_DNS_LENGTH_PREFIX) < buffer.readableBytes()) {
+    while (buffer.readableBytes() > TCPDecoder.TCP_DNS_LENGTH_PREFIX) {
 
-      int msgLen = dnsMessageLen(buffer);
-      if (msgLen > 0 && (buffer.readableBytes() >= msgLen)) {
-        if (sharedDnsBuffer.length < msgLen) {
-          sharedDnsBuffer = new byte[msgLen];
+      int len = dnsMessageLen(buffer);
+
+      if (len > 0 && (buffer.readableBytes() >= len)) {
+
+        byte[] data = null;
+        int offset = 0;
+
+        // for improved performance try to avoid to create new byte[] and copying
+        // the data bytes to this buffer. Try to use the backing buffer of the ChainBuffer
+
+        if (buffer.readableBytesCurrentBuffer() >= len) {
+          // ChainBuffer uses single byte[] for data we need
+          // prevent copy data to sharedDnsBuffer buffer and just use
+          // the backing buffer from the ChainBuffer
+          data = buffer.currentBuffer();
+          offset = buffer.getOffset();
+          // make sure to advance the position of the offset
+          buffer.position(buffer.position() + len);
+          // the buffer also includes the 2 length bytes before the actual data bytes
+          // <byte><byte>[data]
+          // decoding must start at current buffer offset (after len bytes) and end at length +2.
+          len += 2;
+        } else {
+          // ChainBuffer uses multiple byte[] for data we need
+          // copy data into shared buffer, offset = 0
+          if (sharedDnsBuffer.length < len) {
+            sharedDnsBuffer = new byte[len];
+          }
+
+          buffer.gets(sharedDnsBuffer, 0, len);
+          data = sharedDnsBuffer;
         }
 
-        buffer.gets(sharedDnsBuffer, 0, msgLen);
-        dnsDecoder.decode((DNSPacket) packet, sharedDnsBuffer, msgLen);
+        dnsDecoder.decode((DNSPacket) packet, data, offset, len);
       } else {
         // dns msg requires more bytes than are available
         // might be partial data for the next dns msg
@@ -556,7 +582,7 @@ public class TCPDecoder implements Decoder {
     }
 
     if (log.isDebugEnabled() && ((DNSPacket) packet).getMessageCount() > 1) {
-      log.debug("multiple msg in TCP stream");
+      log.debug("multiple msg in TCP stream: {}", ((DNSPacket) packet).getMessageCount());
     }
 
     return buffer;

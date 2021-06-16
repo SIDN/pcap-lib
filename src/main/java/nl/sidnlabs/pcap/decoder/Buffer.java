@@ -198,6 +198,22 @@ public interface Buffer {
   int readableBytes();
 
   /**
+   * Returns the number of bytes between the current position and the limit of the currently active
+   * backing buffer.
+   * 
+   * @return the number of bytes remaining in this buffer.
+   */
+  int readableBytesCurrentBuffer();
+
+
+  /**
+   * Returns the currently active backing buffer.
+   * 
+   * @return byte[]
+   */
+  byte[] currentBuffer();
+
+  /**
    * Clears this buffer. The position is set to zero and base position is set to zero too. and mark
    * is discarded.
    */

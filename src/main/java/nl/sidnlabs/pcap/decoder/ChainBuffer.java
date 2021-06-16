@@ -698,6 +698,17 @@ public class ChainBuffer implements Buffer {
   }
 
   @Override
+  public byte[] currentBuffer() {
+    return buffers.get(bufIndex);
+  }
+
+  @Override
+  public int readableBytesCurrentBuffer() {
+    byte[] buf = buffers.get(bufIndex);
+    return buf.length - bufOffset;
+  }
+
+  @Override
   public int readableBytes() {
     if (buffers.size() <= 0 || isEOB())
       return 0;

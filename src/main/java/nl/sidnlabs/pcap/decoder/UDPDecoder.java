@@ -85,7 +85,7 @@ public class UDPDecoder implements Decoder {
     packet.setLen(packetData.length);
     packet.setPayloadLength(UDPUtil.getUdpLen(packetData));
 
-    return dnsDecoder.decode((DNSPacket) packet, packetPayload, packetPayload.length);
+    return dnsDecoder.decode((DNSPacket) packet, packetPayload, 0, packetPayload.length);
   }
 
   public byte[] decode(byte[] packetData) {
