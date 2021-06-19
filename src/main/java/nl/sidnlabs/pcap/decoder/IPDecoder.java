@@ -99,8 +99,17 @@ public class IPDecoder {
       int ipHeaderLen = IPv4Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
       packet.setTtl(IPv4Util.decodeTTL(packetData, ipStart));
-      packet.setSrc(IPv4Util.decodeSrc(packetData, ipStart));
-      packet.setDst(IPv4Util.decodeDst(packetData, ipStart));
+      packet.setSrcAddr(IPv4Util.decodeSrc(packetData, ipStart));
+      packet.setDstAddr(IPv4Util.decodeDst(packetData, ipStart));
+
+      if (packet.getSrcAddr() != null) {
+        packet.setSrc(packet.getSrcAddr().getHostAddress());
+      }
+      if (packet.getDstAddr() != null) {
+        packet.setDst(packet.getDstAddr().getHostAddress());
+      }
+
+
       packet.setIpId(IPv4Util.decodeId(packetData, ipStart));
       totalLength = PcapReaderUtil.convertShort(packetData, ipStart + IP_TOTAL_LEN_OFFSET);
       decodeV4Fragmented(packet, ipStart, packetData);
@@ -108,8 +117,16 @@ public class IPDecoder {
       int ipHeaderLen = IPv6Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
       packet.setTtl(IPv6Util.decodeTTL(packetData, ipStart));
-      packet.setSrc(IPv6Util.decodeSrc(packetData, ipStart));
-      packet.setDst(IPv6Util.decodeDst(packetData, ipStart));
+      packet.setSrcAddr(IPv6Util.decodeSrc(packetData, ipStart));
+      packet.setDstAddr(IPv6Util.decodeDst(packetData, ipStart));
+
+      if (packet.getSrcAddr() != null) {
+        packet.setSrc(packet.getSrcAddr().getHostAddress());
+      }
+      if (packet.getDstAddr() != null) {
+        packet.setDst(packet.getDstAddr().getHostAddress());
+      }
+
       packet.setIpId(IPv6Util.decodeId(packetData, ipStart));
       int payloadLength =
           PcapReaderUtil.convertShort(packetData, ipStart + IPv6Util.IPV6_PAYLOAD_LEN_OFFSET);

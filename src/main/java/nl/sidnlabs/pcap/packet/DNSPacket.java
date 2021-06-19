@@ -22,11 +22,13 @@ package nl.sidnlabs.pcap.packet;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import nl.sidnlabs.dnslib.message.Message;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
 public class DNSPacket extends Packet {
 
   // dns messages

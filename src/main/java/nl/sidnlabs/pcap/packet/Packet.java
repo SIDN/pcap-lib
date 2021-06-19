@@ -19,6 +19,7 @@
  */
 package nl.sidnlabs.pcap.packet;
 
+import java.net.InetAddress;
 import lombok.Data;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 
@@ -51,6 +52,8 @@ public class Packet {
   protected byte protocol;
   protected String src;
   protected String dst;
+  protected InetAddress srcAddr;
+  protected InetAddress dstAddr;
   protected long fragOffset;
   protected boolean fragmented;
   protected boolean lastFragment;

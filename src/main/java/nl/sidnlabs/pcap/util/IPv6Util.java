@@ -19,6 +19,7 @@
  */
 package nl.sidnlabs.pcap.util;
 
+import java.net.InetAddress;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.Packet;
 
@@ -54,12 +55,16 @@ public class IPv6Util {
     return packetData[ipStart + IPV6_HOPLIMIT_OFFSET] & 0xFF;
   }
 
-  public static String decodeSrc(byte[] packetData, int ipStart) {
-    return PcapReaderUtil.convertAddress(packetData, ipStart + IPV6_SRC_OFFSET, 16);
+  // public static InetAddress decodeAddress(byte[] packetData, int ipStart) {
+  // return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IPV6_SRC_OFFSET, 16);
+  // }
+
+  public static InetAddress decodeSrc(byte[] packetData, int ipStart) {
+    return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IPV6_SRC_OFFSET, 16);
   }
 
-  public static String decodeDst(byte[] packetData, int ipStart) {
-    return PcapReaderUtil.convertAddress(packetData, ipStart + IPV6_DST_OFFSET, 16);
+  public static InetAddress decodeDst(byte[] packetData, int ipStart) {
+    return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IPV6_DST_OFFSET, 16);
   }
 
   public static long decodeId(byte[] packetData, int ipStart) {

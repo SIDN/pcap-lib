@@ -19,6 +19,7 @@
  */
 package nl.sidnlabs.pcap.util;
 
+import java.net.InetAddress;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 
 public class IPv4Util {
@@ -42,12 +43,16 @@ public class IPv4Util {
     return packetData[ipStart + IP_PROTOCOL_OFFSET];
   }
 
-  public static String decodeSrc(byte[] packetData, int ipStart) {
-    return PcapReaderUtil.convertAddress(packetData, ipStart + IP_SRC_OFFSET, 4);
+  // public static InetAddress decodeAddress(byte[] packetData, int ipStart) {
+  // return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IP_SRC_OFFSET, 4);
+  // }
+
+  public static InetAddress decodeSrc(byte[] packetData, int ipStart) {
+    return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IP_SRC_OFFSET, 4);
   }
 
-  public static String decodeDst(byte[] packetData, int ipStart) {
-    return PcapReaderUtil.convertAddress(packetData, ipStart + IP_DST_OFFSET, 4);
+  public static InetAddress decodeDst(byte[] packetData, int ipStart) {
+    return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IP_DST_OFFSET, 4);
   }
 
   public static int decodeId(byte[] packetData, int ipStart) {

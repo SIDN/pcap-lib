@@ -89,11 +89,12 @@ public class PcapReaderUtil {
     return protocols.get(identifier);
   }
 
-  public static String convertAddress(byte[] data, int offset, int size) {
-    byte[] addr = new byte[size];
-    System.arraycopy(data, offset, addr, 0, addr.length);
+  public static InetAddress convertDataToInetAddress(byte[] data, int offset, int size) {
+
     try {
-      return InetAddress.getByAddress(addr).getHostAddress();
+      byte[] addr = new byte[size];
+      System.arraycopy(data, offset, addr, 0, addr.length);
+      return InetAddress.getByAddress(addr);
     } catch (UnknownHostException e) {
       log.error("Ivalid host address: ", e);
       return null;
