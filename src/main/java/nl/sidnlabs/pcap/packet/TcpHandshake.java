@@ -1,7 +1,9 @@
 package nl.sidnlabs.pcap.packet;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@NoArgsConstructor
 @Data
 public class TcpHandshake {
 
