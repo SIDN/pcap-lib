@@ -23,7 +23,6 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
@@ -31,7 +30,7 @@ public class PcapReaderUtil {
 
   private PcapReaderUtil() {}
 
-  private static Map<Integer, String> protocols;
+  // private static Map<Integer, String> protocols;
 
   public static long convertInt(byte[] data) {
     return convertInt(data, false);
@@ -85,9 +84,9 @@ public class PcapReaderUtil {
     return placeholder.longValue();
   }
 
-  public static String convertProtocolIdentifier(int identifier) {
-    return protocols.get(identifier);
-  }
+  // public static String convertProtocolIdentifier(int identifier) {
+  // return protocols.get(identifier);
+  // }
 
   public static InetAddress convertDataToInetAddress(byte[] data, int offset, int size) {
 

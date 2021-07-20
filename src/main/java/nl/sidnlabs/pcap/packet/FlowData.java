@@ -4,9 +4,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class FlowData {
 
   private long lastSequence;
@@ -24,7 +26,7 @@ public class FlowData {
    */
   public void addPayload(SequencePayload p) {
     payloads.add(p);
-    lastSequence = p.getSeq().longValue();
+    lastSequence = p.getSeq();
     // do not update the lastSize when adding partial data
     // otherwise matching retransmission based on next expected seq will fail
     lastSize = p.size();

@@ -21,20 +21,22 @@ package nl.sidnlabs.pcap.packet;
 
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Ordering;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class Datagram implements Comparable<Datagram> {
   private String src;
   private String dst;
-  private long id;
+  private Long id;
   private String protocol;
   private long time;
 
   /** no-arg constructor for Kryo **/
   public Datagram() {}
 
-  public Datagram(String src, String dst, long id, String protocol, long time) {
+  public Datagram(String src, String dst, Long id, String protocol, long time) {
     this.src = src;
     this.dst = dst;
     this.id = id;
@@ -44,6 +46,7 @@ public class Datagram implements Comparable<Datagram> {
 
   @Override
   public int compareTo(Datagram o) {
+
     return ComparisonChain
         .start()
         .compare(src, o.src, Ordering.natural().nullsLast())
@@ -52,5 +55,7 @@ public class Datagram implements Comparable<Datagram> {
         .compare(protocol, o.protocol, Ordering.natural().nullsLast())
         .result();
   }
+
+
 
 }

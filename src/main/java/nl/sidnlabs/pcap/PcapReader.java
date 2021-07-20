@@ -30,6 +30,7 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.codec.binary.Hex;
 import com.google.common.collect.Multimap;
 import lombok.extern.log4j.Log4j2;
+import nl.sidnlabs.pcap.decoder.DNSDecoder;
 import nl.sidnlabs.pcap.decoder.ICMPDecoder;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 import nl.sidnlabs.pcap.decoder.TCPDecoder;
@@ -77,17 +78,30 @@ public class PcapReader {
   private int packetCounter;
   private int reassembledPacketCounter;
 
-  private TCPDecoder tcpDecoder = null;
   private IPDecoder ipDecoder = null;
+  // when true only decode part of the data
+  private boolean partial;
+  private String filename;
 
-  public PcapReader(DataInputStream is, boolean tcpEnabled) throws IOException {
+  public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, String filename,
+      boolean partial) throws IOException {
     log.info("Create new PCAP reader");
     this.is = is;
+    this.filename = filename;
+    this.partial = partial;
 
-    if (tcpEnabled) {
-      tcpDecoder = new TCPDecoder();
+    if (ipDecoder != null) {
+      this.ipDecoder = ipDecoder;
+    } else {
+      DNSDecoder dnsDecoder = new DNSDecoder(false);
+
+      TCPDecoder tcpDecoder = null;
+      if (tcpEnabled) {
+        tcpDecoder = new TCPDecoder(dnsDecoder);
+      }
+
+      this.ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(dnsDecoder), new ICMPDecoder());
     }
-    ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(), new ICMPDecoder());
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
     if (!readBytes(pcapHeader)) {
@@ -118,6 +132,9 @@ public class PcapReader {
     return StreamSupport.stream(valueIterable.spliterator(), false);
   }
 
+  public Iterable<Packet> iter() {
+    return PacketIterator::new;
+  }
 
   /**
    * Clear expired cache entries in order to avoid memory problems
@@ -127,15 +144,17 @@ public class PcapReader {
    */
   public void clearCache(int tcpCacheTTL, int ipCacheTTL) {
     ipDecoder.clearCache(ipCacheTTL);
-    if (tcpDecoder != null) {
-      tcpDecoder.clearCache(tcpCacheTTL);
+    if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
+      ((TCPDecoder) ipDecoder.getTcpReader()).clearCache(tcpCacheTTL);
     }
   }
 
   public void close() {
 
-    // print stats
-    ipDecoder.printStats();
+    if (!partial) {
+      // print stats only when doing full decoing
+      ipDecoder.printStats();
+    }
 
     try {
       is.close();
@@ -178,8 +197,9 @@ public class PcapReader {
 
     // decode the packet bytes
     Packet decodedPacket =
-        ipDecoder.decode(packetData, ipStart, packetTimestampSecs, packetTimestampMicros);
+        ipDecoder.decode(packetData, ipStart, packetTimestampSecs, packetTimestampMicros, partial);
 
+    decodedPacket.setFilename(filename);
     packetCounter++;
     return decodedPacket;
   }
@@ -246,7 +266,10 @@ public class PcapReader {
 
   protected boolean readBytes(byte[] buf) {
     try {
-      is.readFully(buf);
+      // is.readFully(buf);
+      if (is.read(buf, 0, buf.length) < buf.length) {
+        return false;
+      }
     } catch (EOFException e) {
       // Reached the end of the stream
       caughtEOF = true;
@@ -259,16 +282,9 @@ public class PcapReader {
     return true;
   }
 
-  public Map<TCPFlow, FlowData> getFlows() {
-    if (tcpDecoder != null) {
-      return tcpDecoder.getFlows();
-    }
-    return null;
-  }
-
-  public void setFlows(Map<TCPFlow, FlowData> flows) {
-    if (tcpDecoder != null) {
-      tcpDecoder.setFlows(flows);
+  public void setTcpFlows(Map<TCPFlow, FlowData> flows) {
+    if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
+      ((TCPDecoder) ipDecoder.getTcpReader()).setFlows(flows);
     }
   }
 
@@ -277,13 +293,6 @@ public class PcapReader {
 
     private void fetchNext() {
       if (next == null) {
-        // 1st check if reassembled response is available
-        // if (tcpDecoder.hasReassembledPackets()) {
-        // next = tcpDecoder.getNextReassmbledPacket();
-        // reassembledPacketCounter++;
-        // return;
-        // }
-
         // skip fragmented packets until they are assembled
         do {
           try {
@@ -301,20 +310,21 @@ public class PcapReader {
       // fetchNext will keep result in "next" var so that when next() is
       // called the data does not have to be parsed a 2nd time
       fetchNext();
-      if (next != null)
+      if (next != null) {
         return true;
-
-      // // there might still be a reassembled packet in the tcpdecoder waiting to
-      // // be fetched.
-      // if (tcpDecoder.hasReassembledPackets()) {
-      // return true;
-      // }
+      }
 
       // no more data left
-      int remainingFlows =
-          tcpDecoder != null ? tcpDecoder.getFlows().size() : 0 + ipDecoder.getDatagrams().size();
+      int remainingFlows = 0;
+      if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
+        remainingFlows = ((TCPDecoder) ipDecoder.getTcpReader()).getFlows().size()
+            + ipDecoder.getDatagrams().size();
+      }
+
       if (remainingFlows > 0) {
-        log.warn("Still " + remainingFlows + " flows queued. Missing packets to finish assembly?");
+        log
+            .warn("Still " + remainingFlows
+                + " flows or datagrams queued. Missing packets to finish assembly?");
         log.warn("Packets processed: " + packetCounter);
         log.warn("Reassembled response packets: " + reassembledPacketCounter);
       }

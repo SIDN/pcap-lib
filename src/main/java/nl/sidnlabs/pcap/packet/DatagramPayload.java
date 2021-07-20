@@ -21,20 +21,18 @@ package nl.sidnlabs.pcap.packet;
 
 
 import com.google.common.collect.ComparisonChain;
-import lombok.Data;
-import lombok.ToString;
+import lombok.Getter;
 
-@Data
+@Getter
 public class DatagramPayload implements Comparable<DatagramPayload> {
   private long offset;
-  @ToString.Exclude
   private byte[] payload;
 
 
   /** no-arg constructor for Kryo **/
   public DatagramPayload() {}
 
-  public DatagramPayload(Long offset, byte[] payload) {
+  public DatagramPayload(long offset, byte[] payload) {
     this.offset = offset;
     this.payload = payload;
   }

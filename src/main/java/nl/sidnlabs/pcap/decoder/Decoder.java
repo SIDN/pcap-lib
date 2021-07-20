@@ -16,4 +16,5 @@ public interface Decoder {
 
   void printStats();
 
+  void reset();
 }

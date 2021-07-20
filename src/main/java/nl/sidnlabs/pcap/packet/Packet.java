@@ -20,7 +20,8 @@
 package nl.sidnlabs.pcap.packet;
 
 import java.net.InetAddress;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 
 /**
@@ -30,18 +31,24 @@ import nl.sidnlabs.pcap.decoder.IPDecoder;
  * added to the Packet object.
  * 
  */
-@Data
+@Getter
+@Setter
 public class Packet {
 
   // special null packet indicating error or no-data situation.
   public static final Packet NULL = new Packet();
+  public static final Packet LAST = new Packet();
+
+  private byte[] data;
+  private int ipStart;
+  private String filename;
 
   // network
   protected int len;
   // time in seconds
-  protected long tsSec;
+  // protected long tsSec;
   // time in micros relative to tsSec (in secs)
-  protected long tsMicro;
+  // protected long tsMicro;
   // time in millis when packet was sent ( tsSec + tsmicros)
   protected long tsMilli;
   // ip
@@ -86,11 +93,8 @@ public class Packet {
 
   // if this is a tcp packet and a handshake has been completed
   // then tcpHandshake will contain the timestamps
-  protected TcpHandshake tcpHandshake;
-  // time in millis between time packet was sent by server
-  // and when ack for packet was received in case of TCP use( tsSec + tsmicros)
-  // protected int tcpPacketRtt = -1;
-  // private boolean tcpRetransmission;
+  // protected TcpHandshake tcpHandshake;
+  protected int tcpHandshakeRTT = -1;
 
   private TCPFlow flow;
   private TCPFlow reverseFlow;
@@ -127,8 +131,8 @@ public class Packet {
 
 
   public Datagram getDatagram() {
-    return new Datagram(getSrc(), getDst(), getIpId(), String.valueOf(getProtocol()),
-        System.currentTimeMillis());
+    return new Datagram(getSrc(), getDst(), Long.valueOf(getIpId()), String.valueOf(getProtocol()),
+        getTsMilli());
   }
 
 
@@ -140,10 +144,6 @@ public class Packet {
     return getIpVersion() == IPDecoder.IP_PROTOCOL_VERSION_6;
   }
 
-  // public boolean hasPacketRtt() {
-  // return tcpPacketRtt != -1;
-  // }
-
   /**
    * Calculate next sequence number
    * 
@@ -152,5 +152,28 @@ public class Packet {
   public long nextAck() {
     return tcpSeq + payloadLength;
   }
+
+  // public InetAddress getSrcAddr() {
+  // if (srcAddr == null) {
+  //
+  // }
+  // return srcAddr;
+  // }
+  //
+  // public InetAddress getDstAddr() {
+  // if (dstAddr == null) {
+  //
+  // }
+  // return dstAddr;
+  // }
+  //
+  // private InetAddress toInetAddress(String address) {
+  //
+  // try {
+  // return InetAddresses.toAddrString(dstAddr).forString(address);
+  // } catch (Exception e) {
+  // return null;
+  // }
+  // }
 
 }

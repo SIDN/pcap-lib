@@ -22,19 +22,23 @@ package nl.sidnlabs.pcap.decoder;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Bytes;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
+import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.ICMPPacket;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.PacketFactory;
+import nl.sidnlabs.pcap.packet.TCPFlow;
 import nl.sidnlabs.pcap.util.IPv4Util;
 import nl.sidnlabs.pcap.util.IPv6Util;
 
@@ -42,7 +46,8 @@ import nl.sidnlabs.pcap.util.IPv6Util;
  * Decode the IP header
  *
  */
-@Data
+@Getter
+@Setter
 @Log4j2
 public class IPDecoder {
 
@@ -54,9 +59,13 @@ public class IPDecoder {
 
   private Multimap<Datagram, DatagramPayload> datagrams = TreeMultimap.create();
 
+  private int counter;
+  private int counterPayload;
   private Decoder tcpReader;
   private Decoder udpReader;
   private ICMPDecoder icmpDecoder;
+
+  private long lastPacketTs;
 
 
   public IPDecoder(Decoder tcpReader, Decoder udpReader, ICMPDecoder icmpDecoder) {
@@ -66,6 +75,10 @@ public class IPDecoder {
   }
 
   public void printStats() {
+    log.info("------------- IP Decoder Stats --------------------------");
+    log.info("Packets total: {}", Integer.valueOf(counter));
+    log.info("Packets payload: {}", Integer.valueOf(counterPayload));
+
     udpReader.printStats();
     if (tcpReader != null) {
       tcpReader.printStats();
@@ -74,22 +87,22 @@ public class IPDecoder {
   }
 
   public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
-      long packetTimestampMicros) {
+      long packetTimestampMicros, boolean partial) {
+    counter++;
 
     if (ipStart == -1)
       return Packet.NULL;
 
-    Packet p = createPacket(packetData, ipStart);
+    Packet packet = createPacket(packetData, ipStart);
+    if (packet == Packet.NULL) {
+      return packet;
+    }
 
-    p.setTsSec(packetTimestampSecs);
-    p.setTsMicro(packetTimestampMicros);
     // calc the timestamp in milliseconds = seconds + micros combined
-    p.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
+    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
+    packet.setData(packetData);
+    packet.setIpStart(ipStart);
 
-    return decode(p, packetData, ipStart);
-  }
-
-  private Packet decode(Packet packet, byte[] packetData, int ipStart) {
 
     int ipProtocolHeaderVersion = IPv4Util.getInternetProtocolHeaderVersion(packetData, ipStart);
     packet.setIpVersion(ipProtocolHeaderVersion);
@@ -140,9 +153,36 @@ public class IPDecoder {
     }
 
     packet.setTotalLength(totalLength);
+
+    if (partial) {
+      // return raw byte[], decoding will be done later
+      return packet;
+    }
+
+    // keep last packet time for cache timing
+    lastPacketTs = packet.getTsMilli();
+
+    // return fully decoded packet
+    return decode(packet, packetData, ipStart);
+  }
+
+  public Packet decode(Packet packet) {
+    counterPayload++;
+    if (packet == Packet.NULL || packet == Packet.LAST) {
+      return packet;
+    }
+
+    Packet p = decode(packet, packet.getData(), packet.getIpStart());
+    // remove raw bytes
+    p.setData(null);
+    return p;
+  }
+
+  public Packet decode(Packet packet, byte[] packetData, int ipStart) {
+
     // check for presence of ethernet padding, eth frames must be minumum of 64bytes
     // and eth adapters can add padding to get 64 byte packet size
-    int padding = Math.max(packetData.length - (totalLength + ipStart), 0);
+    int padding = Math.max(packetData.length - (packet.getTotalLength() + ipStart), 0);
 
     /*
      * Copy the IP payload into a packetData. Make sure there is no ethernet padding present. see:
@@ -304,24 +344,38 @@ public class IPDecoder {
     this.datagrams = datagrams;
   }
 
+  public void setTcpFlows(Map<TCPFlow, FlowData> flows) {
+    if (tcpReader != null && tcpReader instanceof TCPDecoder) {
+      ((TCPDecoder) tcpReader).setFlows(flows);
+    }
+  }
+
+
+
   /**
    * Clear expired cache entries in order to avoid memory problems
    * 
    * @param ipFragmentTTL timeout for IP fragments
    */
   public void clearCache(int ipFragmentTTL) {
-    long now = System.currentTimeMillis();
+    long max = lastPacketTs - ipFragmentTTL;
     // check IP datagrams
-    List<Datagram> dgExpiredList = datagrams
-        .keySet()
-        .stream()
-        .filter(k -> (k.getTime() + ipFragmentTTL) <= now)
-        .collect(Collectors.toList());
+    List<Datagram> dgExpiredList =
+        datagrams.keySet().stream().filter(k -> k.getTime() < max).collect(Collectors.toList());
 
+    log.info("------------- IP Decoder Cache Stats ---------------------");
     log.info("IP datagram cache size: " + datagrams.size());
     log.info("Expired (to be removed) IP datagrams: " + dgExpiredList.size());
 
     // remove expired IP datagrams
     dgExpiredList.stream().forEach(dg -> datagrams.removeAll(dg));
+  }
+
+  public void reset() {
+    udpReader.reset();
+    if (tcpReader != null) {
+      tcpReader.reset();
+    }
+    icmpDecoder.reset();
   }
 }

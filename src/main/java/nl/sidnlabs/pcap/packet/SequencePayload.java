@@ -31,7 +31,7 @@ import nl.sidnlabs.pcap.decoder.ChainBuffer;
 @Getter
 @Setter
 public class SequencePayload implements Comparable<SequencePayload> {
-  private Long seq;
+  private long seq;
   // do not use the actual payload bytes to create string rep and to calc the hash
   // this takes too much cpu resources
   private byte[] bytes;
@@ -40,12 +40,10 @@ public class SequencePayload implements Comparable<SequencePayload> {
   private ChainBuffer buffer;
   private long time;
   private long nextSequence;
-  // ignore = true when payload is received out of order
-  private boolean ignore;
 
   public SequencePayload() {}
 
-  public SequencePayload(Long seq, byte[] bytes, long time, TCPFlow flow) {
+  public SequencePayload(long seq, byte[] bytes, long time, TCPFlow flow) {
     this.seq = seq;
     this.bytes = bytes;
     this.time = time;
@@ -79,16 +77,15 @@ public class SequencePayload implements Comparable<SequencePayload> {
   @Override
   public String toString() {
     return "SequencePayload [seq=" + seq + ", time=" + time + ", nextSequence=" + nextSequence
-        + ", ignore=" + ignore + "]";
+        + "]";
   }
 
   @Override
   public int hashCode() {
     final int prime = 31;
     int result = 1;
-    result = prime * result + (ignore ? 1231 : 1237);
     result = prime * result + (int) (nextSequence ^ (nextSequence >>> 32));
-    result = prime * result + ((seq == null) ? 0 : seq.hashCode());
+    result = prime * result + (int) (seq ^ (seq >>> 32));
     result = prime * result + (int) (time ^ (time >>> 32));
     return result;
   }
@@ -102,19 +99,14 @@ public class SequencePayload implements Comparable<SequencePayload> {
     if (getClass() != obj.getClass())
       return false;
     SequencePayload other = (SequencePayload) obj;
-    if (ignore != other.ignore)
-      return false;
     if (nextSequence != other.nextSequence)
       return false;
-    if (seq == null) {
-      if (other.seq != null)
-        return false;
-    } else if (!seq.equals(other.seq))
+    if (seq != other.seq)
       return false;
     if (time != other.time)
       return false;
-
     return true;
   }
+
 
 }

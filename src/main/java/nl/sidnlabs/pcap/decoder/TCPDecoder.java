@@ -26,7 +26,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
@@ -38,7 +39,8 @@ import nl.sidnlabs.pcap.packet.TCPFlow;
 import nl.sidnlabs.pcap.packet.TcpHandshake;
 import nl.sidnlabs.pcap.packet.TcpHandshake.HANDSHAKE_STATE;
 
-@Data
+@Getter
+@Setter
 @Log4j2
 public class TCPDecoder implements Decoder {
 
@@ -72,12 +74,8 @@ public class TCPDecoder implements Decoder {
 
   private long lastPacketTs = 0;
 
-  public TCPDecoder() {
-    this(false);
-  }
-
-  public TCPDecoder(boolean allowfail) {
-    dnsDecoder = new DNSDecoder(allowfail);
+  public TCPDecoder(DNSDecoder dnsDecoder) {
+    this.dnsDecoder = dnsDecoder;
   }
 
   private FlowData removeFlow(TCPFlow flow) {
@@ -104,7 +102,7 @@ public class TCPDecoder implements Decoder {
     packetCounter += 1;
 
     if (log.isDebugEnabled()) {
-      log.debug("Received {} packets", packetCounter);
+      log.debug("Received {} packets", Integer.valueOf(packetCounter));
     }
 
     packetPayload = decode(packet, packetData);
@@ -159,7 +157,7 @@ public class TCPDecoder implements Decoder {
           new SequencePayload(packet.getTcpSeq(), bytes, packet.getTsMilli(), flow);
 
       if (log.isDebugEnabled()) {
-        log.debug("reassemble, tcp bytes len: {}", packetPayload.limit());
+        log.debug("reassemble, tcp bytes len: {}", Integer.valueOf(packetPayload.limit()));
       }
 
       // add the segment/sequence to flowdata
@@ -210,7 +208,7 @@ public class TCPDecoder implements Decoder {
         if (handshake != null && HANDSHAKE_STATE.ACK_RECV == handshake.getState()) {
           // add handshake to the first packet after the handshake was completed, must be in state
           // HANDSHAKE_STATE.ACK_RECV
-          packet.setTcpHandshake(handshake);
+          packet.setTcpHandshakeRTT(handshake.rtt());
         }
 
         // if packet is server response then keep it in reassembledPackets map until we get a
@@ -231,7 +229,7 @@ public class TCPDecoder implements Decoder {
             if (log.isDebugEnabled()) {
               log
                   .debug("Reassembled packet with {} DNS messages",
-                      ((DNSPacket) packet).getMessageCount());
+                      Integer.valueOf(((DNSPacket) packet).getMessageCount()));
             }
 
             return packet;
@@ -402,10 +400,11 @@ public class TCPDecoder implements Decoder {
     SequencePayload prev = null;
     for (SequencePayload seqPayload : seqPayloads) {
       if (prev != null && !seqPayload.linked(prev)) {
+        // if (log.isDebugEnabled()) {
         log
             .warn("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
                 + " has Broken sequence chain between " + seqPayload + " and " + prev);
-        seqPayload.setIgnore(true);
+        // }
         return Collections.emptyList();
       }
       prev = seqPayload;
@@ -521,7 +520,7 @@ public class TCPDecoder implements Decoder {
       if (log.isDebugEnabled()) {
         log
             .debug("Reading DNS message len from failed failed, only {} bytes remaining",
-                payload.readableBytes());
+                Integer.valueOf(payload.readableBytes()));
       }
 
       return 0;
@@ -582,7 +581,9 @@ public class TCPDecoder implements Decoder {
     }
 
     if (log.isDebugEnabled() && ((DNSPacket) packet).getMessageCount() > 1) {
-      log.debug("multiple msg in TCP stream: {}", ((DNSPacket) packet).getMessageCount());
+      log
+          .debug("multiple msg in TCP stream: {}",
+              Integer.valueOf(((DNSPacket) packet).getMessageCount()));
     }
 
     return buffer;
@@ -602,6 +603,7 @@ public class TCPDecoder implements Decoder {
       }
     }
 
+    log.info("------------- TCP Decoder Cache Stats --------------------");
     log.info("TCP flow cache size: " + flows.size());
     log.info("Expired (to be removed) TCP flows: " + expiredList.size());
 
@@ -610,13 +612,23 @@ public class TCPDecoder implements Decoder {
   }
 
   public void printStats() {
-    log.info("------------- TCP stats --------------");
-    log.info("packetCounter: {}", packetCounter);
-    log.info("reqPacketCounter: {}", reqPacketCounter);
-    log.info("rspPacketCounter: {}", rspPacketCounter);
-    log.info("dnsRspMsgCounter: {}", dnsRspMsgCounter);
-    log.info("dnsReqMsgCounter: {}", dnsReqMsgCounter);
-    log.info("----------------------------------------------------");
+    log.info("---------------------- TCP Decoder Stats -----------------");
+    log.info("packetCounter: {}", Integer.valueOf(packetCounter));
+    log.info("reqPacketCounter: {}", Integer.valueOf(reqPacketCounter));
+    log.info("rspPacketCounter: {}", Integer.valueOf(rspPacketCounter));
+    log.info("dnsRspMsgCounter: {}", Integer.valueOf(dnsRspMsgCounter));
+    log.info("dnsReqMsgCounter: {}", Integer.valueOf(dnsReqMsgCounter));
+  }
+
+  @Override
+  public void reset() {
+    packetCounter = 0;
+    reqPacketCounter = 0;
+    rspPacketCounter = 0;
+    dnsRspMsgCounter = 0;
+    dnsReqMsgCounter = 0;
+
+    dnsDecoder.reset();
   }
 
 }

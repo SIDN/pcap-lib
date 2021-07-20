@@ -19,7 +19,8 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.dnslib.message.Message;
 import nl.sidnlabs.dnslib.message.util.NetworkData;
@@ -30,15 +31,19 @@ import nl.sidnlabs.pcap.packet.Packet;
  * Decode the dns payload of an UDP or TCP message
  *
  */
-@Data
+@Getter
+@Setter
 @Log4j2
 public class DNSDecoder {
 
   // if true then ignore any error, this can happen when decoding
   // partial dns messages that are the payload in ICMP packets.
   private boolean allowFail;
-  private int dnsDecodeError;
+  private int messageDecodeError;
   private int messageCounter;
+
+  // reuse network data instance
+  private NetworkData networkData;
 
   public DNSDecoder(boolean allowFail) {
     this.allowFail = allowFail;
@@ -60,14 +65,20 @@ public class DNSDecoder {
       // decode the message use partial == true
       // this will save of lot of objects from getting created
       // and this results in less garbage collection delays
-      dnsPacket.pushMessage(new Message(new NetworkData(payload, offset, length), true, allowFail));
+      if (networkData == null) {
+        networkData = new NetworkData(payload, offset, length);
+      } else {
+        // reuse existing data object, no need to allocate new memory
+        networkData.update(payload, offset, length);
+      }
+      dnsPacket.pushMessage(new Message(networkData, true, allowFail));
       messageCounter++;
     } catch (Exception e) {
       if (!allowFail) {
         if (log.isDebugEnabled()) {
           log.debug("Error decoding, maybe corrupt packet? " + dnsPacket, e);
         }
-        dnsDecodeError++;
+        messageDecodeError++;
       }
     }
 
@@ -75,8 +86,14 @@ public class DNSDecoder {
   }
 
   public void reset() {
-    dnsDecodeError = 0;
+    messageDecodeError = 0;
     messageCounter = 0;
+  }
+
+  public void printStats() {
+    log.info("---------------- DNS decoder stats -----------------------");
+    log.info("Messages: {}", Integer.valueOf(messageCounter));
+    log.info("Errors: {}", Integer.valueOf(messageDecodeError));
   }
 
 }

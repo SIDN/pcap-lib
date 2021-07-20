@@ -19,8 +19,10 @@
  */
 package nl.sidnlabs.pcap.decoder;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
+import nl.sidnlabs.pcap.PcapReader;
 import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Packet;
@@ -31,18 +33,17 @@ import nl.sidnlabs.pcap.util.UDPUtil;
  *
  */
 @Log4j2
-@Data
+@Getter
+@Setter
 public class UDPDecoder implements Decoder {
 
   private DNSDecoder dnsDecoder;
   private int packetCounter = 0;
+  private int reqCounter = 0;
+  private int respCounter = 0;
 
-  public UDPDecoder() {
-    this(false);
-  }
-
-  public UDPDecoder(boolean allowfail) {
-    dnsDecoder = new DNSDecoder(allowfail);
+  public UDPDecoder(DNSDecoder dnsDecoder) {
+    this.dnsDecoder = dnsDecoder;
   }
 
 
@@ -81,6 +82,12 @@ public class UDPDecoder implements Decoder {
       return Packet.NULL;
     }
 
+    if (packet.getDstPort() == PcapReader.DNS_PORT) {
+      reqCounter++;
+    } else {
+      respCounter++;
+    }
+
     // total length of packet, might be wrong if icmp truncation is in play
     packet.setLen(packetData.length);
     packet.setPayloadLength(UDPUtil.getUdpLen(packetData));
@@ -95,8 +102,18 @@ public class UDPDecoder implements Decoder {
 
 
   public void printStats() {
-    log.info("------------- UDP stats ----------------------------");
-    log.info("packetCounter: {}", packetCounter);
-    log.info("----------------------------------------------------");
+    log.info("------------- UDP Decoder Stats --------------------------");
+    log.info("Packets: {}", Integer.valueOf(packetCounter));
+    log.info("Requests: {}", Integer.valueOf(reqCounter));
+    log.info("Responses: {}", Integer.valueOf(respCounter));
+  }
+
+  @Override
+  public void reset() {
+    packetCounter = 0;
+    reqCounter = 0;
+    respCounter = 0;
+
+    dnsDecoder.reset();
   }
 }
