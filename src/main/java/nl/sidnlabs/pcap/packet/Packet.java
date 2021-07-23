@@ -92,8 +92,7 @@ public class Packet {
   protected int payloadLength;
 
   // if this is a tcp packet and a handshake has been completed
-  // then tcpHandshake will contain the timestamps
-  // protected TcpHandshake tcpHandshake;
+  // then tcpHandshakeRTT will contain the rtt
   protected int tcpHandshakeRTT = -1;
 
   private TCPFlow flow;
