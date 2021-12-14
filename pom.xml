@@ -29,7 +29,7 @@
 		<connection>scm:git:ssh://github.com/SIDN/pcap-lib.git</connection>
 		<developerConnection>scm:git:ssh://github.com/SIDN/pcap-lib.git</developerConnection>
 		<url>https://github.com/SIDN/pcap-lib/tree/master/</url>
-		<tag>HEAD</tag>
+		<tag>pcap-lib-0.2.18</tag>
 	</scm>
 
 	<properties>
