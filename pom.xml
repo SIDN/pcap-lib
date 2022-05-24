@@ -18,8 +18,8 @@
 
 	<developers>
 		<developer>
-			<name>Maarten Wullink</name>
-			<email>maarten.wullink@sidn.nl</email>
+			<name>SIDN Labs</name>
+			<email>sidnlabs@sidn.nl</email>
 			<organization>SIDN</organization>
 			<organizationUrl>https://www.sidn.nl</organizationUrl>
 		</developer>
@@ -36,14 +36,14 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<project.scm.id>github-server</project.scm.id>
-		<java.version>11</java.version>
+		<java.version>17</java.version>
 	</properties>
 
 	<dependencies>
 		<dependency>
 			<groupId>nl.sidnlabs</groupId>
 			<artifactId>dnslib</artifactId>
-			<version>0.2.14</version>
+			<version>0.2.15</version>
 		</dependency>
 
 
@@ -113,10 +113,10 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.1</version>
+				<version>3.10.1</version>
 				<configuration>
-					<source>11</source>
-					<target>11</target>
+					<source>17</source>
+					<target>17</target>
 				</configuration>
 			</plugin>
 			<plugin>

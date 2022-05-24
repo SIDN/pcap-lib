@@ -62,8 +62,7 @@ public class PcapReader {
   public static final int ETHERNET_TYPE_IP = 0x800;
   public static final int ETHERNET_TYPE_IPV6 = 0x86dd;
   public static final int ETHERNET_TYPE_8021Q = 0x8100;
-  public static final int SLL_HEADER_BASE_SIZE = 10; // SLL stands for Linux cooked-mode capture
-  public static final int SLL_ADDRESS_LENGTH_OFFSET = 4; // relative to SLL header
+  public static final int SLL_HEADER_SIZE = 16; // SLL stands for Linux cooked-mode capture
 
   public static final int PROTOCOL_FRAGMENTED = -1;
 
@@ -195,12 +194,16 @@ public class PcapReader {
     long packetTimestampMicros = PcapReaderUtil
         .convertInt(pcapPacketHeader, TIMESTAMP_MICROS_OFFSET, reverseHeaderByteOrder);
 
+    if (packetCounter == 1673) {
+      System.out.println("stop");
+    }
     // decode the packet bytes
     Packet decodedPacket =
         ipDecoder.decode(packetData, ipStart, packetTimestampSecs, packetTimestampMicros, partial);
 
     decodedPacket.setFilename(filename);
     packetCounter++;
+
     return decodedPacket;
   }
 
@@ -256,8 +259,7 @@ public class PcapReader {
       case LOOP:
         return 4;
       case LINUX_SLL:
-        return SLL_HEADER_BASE_SIZE
-            + PcapReaderUtil.convertShort(packet, SLL_ADDRESS_LENGTH_OFFSET);
+        return SLL_HEADER_SIZE;
     }
     return -1;
   }

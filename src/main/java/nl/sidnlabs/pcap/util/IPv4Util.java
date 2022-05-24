@@ -43,10 +43,6 @@ public class IPv4Util {
     return packetData[ipStart + IP_PROTOCOL_OFFSET];
   }
 
-  // public static InetAddress decodeAddress(byte[] packetData, int ipStart) {
-  // return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IP_SRC_OFFSET, 4);
-  // }
-
   public static InetAddress decodeSrc(byte[] packetData, int ipStart) {
     return PcapReaderUtil.convertDataToInetAddress(packetData, ipStart + IP_SRC_OFFSET, 4);
   }
