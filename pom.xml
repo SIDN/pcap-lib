@@ -37,13 +37,14 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<project.scm.id>github-server</project.scm.id>
 		<java.version>17</java.version>
+		<gpg.executable>/usr/local/bin/gpg</gpg.executable>
 	</properties>
 
 	<dependencies>
 		<dependency>
 			<groupId>nl.sidnlabs</groupId>
 			<artifactId>dnslib</artifactId>
-			<version>0.2.15</version>
+			<version>0.2.16-SNAPSHOT</version>
 		</dependency>
 
 
@@ -144,11 +145,11 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
+			</plugin><!--
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-gpg-plugin</artifactId>
-				<version>3.0.1</version>
+				<version>3.1.0</version>
 				<executions>
 					<execution>
 						<id>sign-artifacts</id>
@@ -158,7 +159,7 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
+			</plugin> -->
 			<plugin>
 				<groupId>org.sonatype.plugins</groupId>
 				<artifactId>nexus-staging-maven-plugin</artifactId>

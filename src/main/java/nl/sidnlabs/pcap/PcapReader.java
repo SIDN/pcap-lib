@@ -85,7 +85,7 @@ public class PcapReader {
 
   public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, String filename,
       boolean partial) throws IOException {
-    log.info("Create new PCAP reader");
+
     this.is = is;
     this.filename = filename;
     this.partial = partial;
@@ -167,7 +167,7 @@ public class PcapReader {
     byte[] pcapPacketHeader = new byte[PACKET_HEADER_SIZE];
     if (!readBytes(pcapPacketHeader)) {
       // no more data left
-      log.info("Reached end of file, or zero-length file?");
+      log.debug("Reached end of file, or zero-length file?");
       return null;
     }
 
@@ -329,11 +329,11 @@ public class PcapReader {
       }
 
       if (remainingFlows > 0) {
-        log
-            .warn("Still " + remainingFlows
-                + " flows or datagrams queued. Missing packets to finish assembly?");
-        log.warn("Packets processed: " + packetCounter);
-        log.warn("Reassembled response packets: " + reassembledPacketCounter);
+        if (log.isDebugEnabled()) {
+          log.debug("Still {} flows or datagrams queued. Missing packets to finish assembly?",remainingFlows);
+          log.debug("Packets processed: {}", packetCounter);
+          log.debug("Reassembled response packets: {}",reassembledPacketCounter);
+        }
       }
 
       return false;

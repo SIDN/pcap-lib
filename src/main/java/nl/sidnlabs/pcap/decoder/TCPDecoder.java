@@ -399,12 +399,12 @@ public class TCPDecoder implements Decoder {
 
     SequencePayload prev = null;
     for (SequencePayload seqPayload : seqPayloads) {
-      if (prev != null && !seqPayload.linked(prev)) {
-        // if (log.isDebugEnabled()) {
+      if ( prev != null && !seqPayload.linked(prev)) {
+         if (log.isDebugEnabled()) {
         log
-            .warn("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
+            .debug("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
                 + " has Broken sequence chain between " + seqPayload + " and " + prev);
-        // }
+         }
         return Collections.emptyList();
       }
       prev = seqPayload;
