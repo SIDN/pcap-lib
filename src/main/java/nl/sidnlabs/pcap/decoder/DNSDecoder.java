@@ -39,6 +39,7 @@ public class DNSDecoder {
   // if true then ignore any error, this can happen when decoding
   // partial dns messages that are the payload in ICMP packets.
   private boolean allowFail;
+  private boolean partial;
   private int messageDecodeError;
   private int messageCounter;
 
@@ -46,7 +47,12 @@ public class DNSDecoder {
   private NetworkData networkData;
 
   public DNSDecoder(boolean allowFail) {
-    this.allowFail = allowFail;
+   this(allowFail, false);
+  }
+  
+  public DNSDecoder(boolean allowFail, boolean partial) {
+	  this.allowFail = allowFail;
+	  this.partial = partial;
   }
 
   /**
@@ -71,7 +77,7 @@ public class DNSDecoder {
         // reuse existing data object, no need to allocate new memory
         networkData.update(payload, offset, length);
       }
-      dnsPacket.pushMessage(new Message(networkData, true, allowFail));
+      dnsPacket.pushMessage(new Message(networkData, partial, allowFail));
       messageCounter++;
     } catch (Exception e) {
       if (!allowFail) {

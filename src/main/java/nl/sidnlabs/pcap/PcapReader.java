@@ -93,7 +93,7 @@ public class PcapReader {
     if (ipDecoder != null) {
       this.ipDecoder = ipDecoder;
     } else {
-      DNSDecoder dnsDecoder = new DNSDecoder(false);
+      DNSDecoder dnsDecoder = new DNSDecoder(false, partial);
 
       TCPDecoder tcpDecoder = null;
       if (tcpEnabled) {
