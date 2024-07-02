@@ -21,12 +21,11 @@ package nl.sidnlabs.pcap.decoder;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Bytes;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -34,11 +33,9 @@ import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
-import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.ICMPPacket;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.PacketFactory;
-import nl.sidnlabs.pcap.packet.TCPFlow;
 import nl.sidnlabs.pcap.util.IPv4Util;
 import nl.sidnlabs.pcap.util.IPv6Util;
 
@@ -83,7 +80,6 @@ public class IPDecoder {
     if (tcpReader != null) {
       tcpReader.printStats();
     }
-    icmpDecoder.printStats();
   }
 
   public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
@@ -154,11 +150,6 @@ public class IPDecoder {
 
     packet.setTotalLength(totalLength);
 
-    if (partial) {
-      // return raw byte[], decoding will be done later
-      return packet;
-    }
-
     // keep last packet time for cache timing
     lastPacketTs = packet.getTsMilli();
 
@@ -168,7 +159,7 @@ public class IPDecoder {
 
   public Packet decode(Packet packet) {
     counterPayload++;
-    if (packet == Packet.NULL || packet == Packet.LAST) {
+    if (packet == Packet.NULL) {
       return packet;
     }
 
@@ -212,12 +203,15 @@ public class IPDecoder {
     } else if (ipProtocolHeaderVersion == IP_PROTOCOL_VERSION_6) {
       protocol = IPv6Util.decodeProtocol(packetData, ipStart);
     } else {
-      log.error("Unsupported IP version " + ipProtocolHeaderVersion + " ipstart=" + ipStart);
+    	if(log.isDebugEnabled()) {
+    		log.debug("Unsupported IP version " + ipProtocolHeaderVersion + " ipstart=" + ipStart);
+    	}
       return Packet.NULL;
     }
     return PacketFactory.create(protocol);
   }
 
+  
   private Packet handlePayload(Packet packet, byte[] packetData) {
 
     if ((PacketFactory.PROTOCOL_ICMP_V4 == packet.getProtocol())
@@ -336,46 +330,4 @@ public class IPDecoder {
     return new byte[0];
   }
 
-  public Multimap<Datagram, DatagramPayload> getDatagrams() {
-    return datagrams;
-  }
-
-  public void setDatagrams(Multimap<Datagram, DatagramPayload> datagrams) {
-    this.datagrams = datagrams;
-  }
-
-  public void setTcpFlows(Map<TCPFlow, FlowData> flows) {
-    if (tcpReader != null && tcpReader instanceof TCPDecoder) {
-      ((TCPDecoder) tcpReader).setFlows(flows);
-    }
-  }
-
-
-
-  /**
-   * Clear expired cache entries in order to avoid memory problems
-   * 
-   * @param ipFragmentTTL timeout for IP fragments
-   */
-  public void clearCache(int ipFragmentTTL) {
-    long max = lastPacketTs - ipFragmentTTL;
-    // check IP datagrams
-    List<Datagram> dgExpiredList =
-        datagrams.keySet().stream().filter(k -> k.getTime() < max).collect(Collectors.toList());
-
-    log.info("------------- IP Decoder Cache Stats ---------------------");
-    log.info("IP datagram cache size: " + datagrams.size());
-    log.info("Expired (to be removed) IP datagrams: " + dgExpiredList.size());
-
-    // remove expired IP datagrams
-    dgExpiredList.stream().forEach(dg -> datagrams.removeAll(dg));
-  }
-
-  public void reset() {
-    udpReader.reset();
-    if (tcpReader != null) {
-      tcpReader.reset();
-    }
-    icmpDecoder.reset();
-  }
 }

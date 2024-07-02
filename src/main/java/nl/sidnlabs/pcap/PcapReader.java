@@ -27,16 +27,15 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
 import org.apache.commons.codec.binary.Hex;
-import com.google.common.collect.Multimap;
+
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.decoder.DNSDecoder;
 import nl.sidnlabs.pcap.decoder.ICMPDecoder;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 import nl.sidnlabs.pcap.decoder.TCPDecoder;
 import nl.sidnlabs.pcap.decoder.UDPDecoder;
-import nl.sidnlabs.pcap.packet.Datagram;
-import nl.sidnlabs.pcap.packet.DatagramPayload;
 import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.TCPFlow;
@@ -74,20 +73,13 @@ public class PcapReader {
   // To read reversed-endian PCAPs; the header is the only part that switches
   private boolean reverseHeaderByteOrder = false;
 
-  // metrics
-  private int packetCounter;
-  private int reassembledPacketCounter;
-
   private IPDecoder ipDecoder = null;
   // when true only decode part of the data
   private boolean partial;
-  private String filename;
 
-  public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, String filename,
-      boolean partial) throws IOException {
+  public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, boolean partial) throws IOException {
 
     this.is = is;
-    this.filename = filename;
     this.partial = partial;
 
     if (ipDecoder != null) {
@@ -136,32 +128,6 @@ public class PcapReader {
     return PacketIterator::new;
   }
 
-  /**
-   * Clear expired cache entries in order to avoid memory problems
-   * 
-   * @param tcpCacheTTL timeout for tcp flows
-   * @param ipCacheTTL timeout for IP fragments
-   */
-  public void clearCache(int tcpCacheTTL, int ipCacheTTL) {
-    ipDecoder.clearCache(ipCacheTTL);
-    if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
-      ((TCPDecoder) ipDecoder.getTcpReader()).clearCache(tcpCacheTTL);
-    }
-  }
-
-  public void close() {
-
-    if (!partial) {
-      // print stats only when doing full decoing
-      ipDecoder.printStats();
-    }
-
-    try {
-      is.close();
-    } catch (IOException e) {
-      log.error("Error closing PCAP data inputstream", e);
-    }
-  }
 
   private Packet nextPacket() {
     byte[] pcapPacketHeader = new byte[PACKET_HEADER_SIZE];
@@ -199,9 +165,6 @@ public class PcapReader {
     // decode the packet bytes
     Packet decodedPacket =
         ipDecoder.decode(packetData, ipStart, packetTimestampSecs, packetTimestampMicros, partial);
-
-    decodedPacket.setFilename(filename);
-    packetCounter++;
 
     return decodedPacket;
   }
@@ -322,20 +285,6 @@ public class PcapReader {
       }
 
       // no more data left
-      int remainingFlows = 0;
-      if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
-        remainingFlows = ((TCPDecoder) ipDecoder.getTcpReader()).getFlows().size()
-            + ipDecoder.getDatagrams().size();
-      }
-
-      if (remainingFlows > 0) {
-        if (log.isDebugEnabled()) {
-          log.debug("Still {} flows or datagrams queued. Missing packets to finish assembly?",remainingFlows);
-          log.debug("Packets processed: {}", packetCounter);
-          log.debug("Reassembled response packets: {}",reassembledPacketCounter);
-        }
-      }
-
       return false;
     }
 
@@ -359,14 +308,6 @@ public class PcapReader {
     public void remove() {
       // Not supported
     }
-  }
-
-  public Multimap<Datagram, DatagramPayload> getDatagrams() {
-    return ipDecoder.getDatagrams();
-  }
-
-  public void setDatagrams(Multimap<Datagram, DatagramPayload> map) {
-    ipDecoder.setDatagrams(map);
   }
 
 }

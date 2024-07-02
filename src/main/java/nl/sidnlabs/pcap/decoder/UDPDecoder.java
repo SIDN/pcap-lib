@@ -103,7 +103,7 @@ public class UDPDecoder implements Decoder {
 
   public void printStats() {
     log.info("------------- UDP Decoder Stats --------------------------");
-    log.info("Packets: {}", Integer.valueOf(packetCounter));
+    log.info("Packets total: {}", Integer.valueOf(packetCounter));
     log.info("Requests: {}", Integer.valueOf(reqCounter));
     log.info("Responses: {}", Integer.valueOf(respCounter));
   }

@@ -37,18 +37,12 @@ public class Packet {
 
   // special null packet indicating error or no-data situation.
   public static final Packet NULL = new Packet();
-  public static final Packet LAST = new Packet();
 
   private byte[] data;
   private int ipStart;
-  private String filename;
 
   // network
   protected int len;
-  // time in seconds
-  // protected long tsSec;
-  // time in micros relative to tsSec (in secs)
-  // protected long tsMicro;
   // time in millis when packet was sent ( tsSec + tsmicros)
   protected long tsMilli;
   // ip
