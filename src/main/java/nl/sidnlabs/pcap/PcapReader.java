@@ -237,16 +237,15 @@ public class PcapReader {
   protected boolean readBytes(byte[] buf) {
     try {
       is.readFully(buf);
+      return true;
     } catch (EOFException e) {
       // Reached the end of the stream
       caughtEOF = true;
-      return false;
     } catch (IOException e) {
       log.error("Error while reading " + buf.length + " bytes from buffer");
-      return false;
     }
 
-    return true;
+    return false;
   }
 
   public void setTcpFlows(Map<TCPFlow, FlowData> flows) {
