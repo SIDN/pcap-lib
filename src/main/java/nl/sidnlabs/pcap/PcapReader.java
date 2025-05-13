@@ -236,10 +236,7 @@ public class PcapReader {
 
   protected boolean readBytes(byte[] buf) {
     try {
-      // is.readFully(buf);
-      if (is.read(buf, 0, buf.length) < buf.length) {
-        return false;
-      }
+      is.readFully(buf);
     } catch (EOFException e) {
       // Reached the end of the stream
       caughtEOF = true;
