@@ -242,7 +242,7 @@ public class PcapReader {
       // Reached the end of the stream
       caughtEOF = true;
     } catch (IOException e) {
-      log.error("Error while reading " + buf.length + " bytes from buffer");
+      throw new PcapReaderException("Error while reading " + buf.length + " bytes from buffer");
     }
 
     return false;
@@ -258,16 +258,16 @@ public class PcapReader {
     private Packet next;
 
     private void fetchNext() {
+      // skip fragmented packets until they are assembled
       if (next == null) {
-        // skip fragmented packets until they are assembled
         do {
-          try {
-            next = nextPacket();
-          } catch (Exception e) {
-            log.error("PCAP decode error: ", e);
-            next = Packet.NULL;
-          }
-        } while (next == Packet.NULL);
+        //try {
+          next = nextPacket();
+       // } catch (Exception e) {
+       //   log.error("PCAP decode error: ", e);
+       //   next = Packet.NULL;
+       // }
+      } while (next == Packet.NULL);
       }
     }
 
