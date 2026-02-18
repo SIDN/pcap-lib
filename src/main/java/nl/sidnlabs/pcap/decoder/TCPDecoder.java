@@ -55,6 +55,7 @@ public class TCPDecoder implements Decoder {
 
   private static final int TCP_DNS_LENGTH_PREFIX = 2;
 
+  private static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.allocate(0);
 
   private DNSDecoder dnsDecoder;
 
@@ -102,7 +103,7 @@ public class TCPDecoder implements Decoder {
     packetCounter += 1;
 
     if (log.isDebugEnabled()) {
-      log.debug("Received {} packets", Integer.valueOf(packetCounter));
+      log.debug("Received {} packets", packetCounter);
     }
 
     packetPayload = decode(packet, packetData);
@@ -157,7 +158,7 @@ public class TCPDecoder implements Decoder {
           new SequencePayload(packet.getTcpSeq(), bytes, packet.getTsMilli(), flow);
 
       if (log.isDebugEnabled()) {
-        log.debug("reassemble, tcp bytes len: {}", Integer.valueOf(packetPayload.limit()));
+        log.debug("reassemble, tcp bytes len: {}", packetPayload.limit());
       }
 
       // add the segment/sequence to flowdata
@@ -229,7 +230,7 @@ public class TCPDecoder implements Decoder {
             if (log.isDebugEnabled()) {
               log
                   .debug("Reassembled packet with {} DNS messages",
-                      Integer.valueOf(((DNSPacket) packet).getMessageCount()));
+                      ((DNSPacket) packet).getMessageCount());
             }
 
             return packet;
@@ -299,7 +300,7 @@ public class TCPDecoder implements Decoder {
 
     int tcpOrUdpHeaderSize = getTcpHeaderLength(packetData);
     if (tcpOrUdpHeaderSize == -1) {
-      return ByteBuffer.allocate(0);
+      return EMPTY_BYTEBUFFER;
     }
     packet.setTcpHeaderLen(tcpOrUdpHeaderSize);
 
@@ -307,21 +308,21 @@ public class TCPDecoder implements Decoder {
     packet.setTcpSeq(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_SEQ_OFFSET));
     packet.setTcpAck(PcapReaderUtil.convertUnsignedInt(packetData, PROTOCOL_HEADER_TCP_ACK_OFFSET));
     // Flags stretch two bytes starting at the TCP header offset
-    int flags = PcapReaderUtil
-        .convertShort(
-            new byte[] {packetData[TCP_HEADER_DATA_OFFSET], packetData[TCP_HEADER_DATA_OFFSET + 1]})
+    // Optimized: read flags directly without creating temporary byte array
+    int flags = (((packetData[TCP_HEADER_DATA_OFFSET] & 0xFF) << 8) 
+        | (packetData[TCP_HEADER_DATA_OFFSET + 1] & 0xFF)) 
         & 0x1FF; // Filter first 7 bits. First 4 are the data offset and the other 3 reserved for
                  // future use.
 
-    packet.setTcpFlagNs((flags & 0x100) == 0 ? false : true);
-    packet.setTcpFlagCwr((flags & 0x80) == 0 ? false : true);
-    packet.setTcpFlagEce((flags & 0x40) == 0 ? false : true);
-    packet.setTcpFlagUrg((flags & 0x20) == 0 ? false : true);
-    packet.setTcpFlagAck((flags & 0x10) == 0 ? false : true);
-    packet.setTcpFlagPsh((flags & 0x8) == 0 ? false : true);
-    packet.setTcpFlagRst((flags & 0x4) == 0 ? false : true);
-    packet.setTcpFlagSyn((flags & 0x2) == 0 ? false : true);
-    packet.setTcpFlagFin((flags & 0x1) == 0 ? false : true);
+    packet.setTcpFlagNs((flags & 0x100) != 0);
+    packet.setTcpFlagCwr((flags & 0x80) != 0);
+    packet.setTcpFlagEce((flags & 0x40) != 0);
+    packet.setTcpFlagUrg((flags & 0x20) != 0);
+    packet.setTcpFlagAck((flags & 0x10) != 0);
+    packet.setTcpFlagPsh((flags & 0x8) != 0);
+    packet.setTcpFlagRst((flags & 0x4) != 0);
+    packet.setTcpFlagSyn((flags & 0x2) != 0);
+    packet.setTcpFlagFin((flags & 0x1) != 0);
 
     // WINDOW size
     packet
@@ -377,12 +378,8 @@ public class TCPDecoder implements Decoder {
   // }
 
   public long readUnsignedInt(byte[] buf) {
-    int byte1 = (0xFF & buf[0]);
-    int byte2 = (0xFF & buf[1]);
-    int byte3 = (0xFF & buf[2]);
-    int byte4 = (0xFF & buf[3]);
-
-    return ((long) (byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)) & 0xFFFFFFFFL;
+    // Optimized: direct bit manipulation instead of intermediate int variables
+    return ((long) (buf[0] & 0xFF) << 24 | (buf[1] & 0xFF) << 16 | (buf[2] & 0xFF) << 8 | (buf[3] & 0xFF)) & 0xFFFFFFFFL;
   }
 
 
@@ -402,8 +399,8 @@ public class TCPDecoder implements Decoder {
       if ( prev != null && !seqPayload.linked(prev)) {
          if (log.isDebugEnabled()) {
         log
-            .debug("Packet src: " + packet.getSrc() + " dst: " + packet.getDst()
-                + " has Broken sequence chain between " + seqPayload + " and " + prev);
+            .debug("Packet src: {} dst: {} has Broken sequence chain between {} and {}",
+                packet.getSrc(), packet.getDst(), seqPayload, prev);
          }
         return Collections.emptyList();
       }
@@ -517,12 +514,6 @@ public class TCPDecoder implements Decoder {
 
   private int dnsMessageLen(ChainBuffer payload) {
     if (payload == null || payload.readableBytes() < 2) {
-      if (log.isDebugEnabled()) {
-        log
-            .debug("Reading DNS message len from failed failed, only {} bytes remaining",
-                Integer.valueOf(payload.readableBytes()));
-      }
-
       return 0;
     }
 
@@ -583,7 +574,7 @@ public class TCPDecoder implements Decoder {
     if (log.isDebugEnabled() && ((DNSPacket) packet).getMessageCount() > 1) {
       log
           .debug("multiple msg in TCP stream: {}",
-              Integer.valueOf(((DNSPacket) packet).getMessageCount()));
+              ((DNSPacket) packet).getMessageCount());
     }
 
     return buffer;
@@ -604,20 +595,20 @@ public class TCPDecoder implements Decoder {
     }
 
     log.info("------------- TCP Decoder Cache Stats --------------------");
-    log.info("TCP flow cache size: " + flows.size());
-    log.info("Expired (to be removed) TCP flows: " + expiredList.size());
+    log.info("TCP flow cache size: {}", flows.size());
+    log.info("Expired (to be removed) TCP flows: {}", expiredList.size());
 
     // remove flows with expired packets
-    expiredList.stream().forEach(s -> removeFlow(s));
+    expiredList.forEach(this::removeFlow);
   }
 
   public void printStats() {
     log.info("---------------------- TCP Decoder Stats -----------------");
-    log.info("Packets total: {}", Integer.valueOf(packetCounter));
-    log.info("Request: {}", Integer.valueOf(reqPacketCounter));
-    log.info("Response: {}", Integer.valueOf(rspPacketCounter));
-    log.info("DNS replies: {}", Integer.valueOf(dnsRspMsgCounter));
-    log.info("DNS queries: {}", Integer.valueOf(dnsReqMsgCounter));
+    log.info("Packets total: {}", packetCounter);
+    log.info("Request: {}", reqPacketCounter);
+    log.info("Response: {}", rspPacketCounter);
+    log.info("DNS replies: {}", dnsRspMsgCounter);
+    log.info("DNS queries: {}", dnsReqMsgCounter);
   }
 
   @Override

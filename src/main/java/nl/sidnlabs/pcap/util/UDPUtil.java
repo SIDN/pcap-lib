@@ -28,13 +28,6 @@ public class UDPUtil {
   public static final int UDP_HEADER_SIZE = 8;
   public static final int UDP_HEADER_LEN_OFFSET = 4;
 
-  public static byte[] extractPayload(byte[] packetData) {
-    int length = packetData.length - UDP_HEADER_SIZE;
-    byte[] data = new byte[length];
-    System.arraycopy(packetData, UDP_HEADER_SIZE, data, 0, length);
-    return data;
-  }
-
   /**
    * Get size of udp packet payload
    * 

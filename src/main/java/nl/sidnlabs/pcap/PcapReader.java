@@ -76,6 +76,9 @@ public class PcapReader {
   private IPDecoder ipDecoder = null;
   // when true only decode part of the data
   private boolean partial;
+  
+  // Reusable buffer for packet headers to avoid millions of allocations
+  private final byte[] packetHeaderBuffer = new byte[PACKET_HEADER_SIZE];
 
   public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, boolean partial) throws IOException {
 
@@ -130,15 +133,23 @@ public class PcapReader {
 
 
   private Packet nextPacket() {
-    byte[] pcapPacketHeader = new byte[PACKET_HEADER_SIZE];
-    if (!readBytes(pcapPacketHeader)) {
+    // Reuse instance buffer instead of allocating new array each time
+    if (!readBytes(packetHeaderBuffer)) {
       // no more data left
-      log.debug("Reached end of file, or zero-length file?");
+      if (log.isDebugEnabled()) {
+        log.debug("Reached end of file, or zero-length file?");
+      }
       return null;
     }
 
+    // Parse packet size and timestamps from header (cache to avoid re-parsing)
     long packetSize =
-        PcapReaderUtil.convertInt(pcapPacketHeader, CAP_LEN_OFFSET, reverseHeaderByteOrder);
+        PcapReaderUtil.convertInt(packetHeaderBuffer, CAP_LEN_OFFSET, reverseHeaderByteOrder);
+    long packetTimestampSecs =
+        PcapReaderUtil.convertInt(packetHeaderBuffer, TIMESTAMP_OFFSET, reverseHeaderByteOrder);
+    long packetTimestampMicros = PcapReaderUtil
+        .convertInt(packetHeaderBuffer, TIMESTAMP_MICROS_OFFSET, reverseHeaderByteOrder);
+    
     byte[] packetData = new byte[(int) packetSize];
 
     if (!readBytes(packetData)) {
@@ -155,12 +166,6 @@ public class PcapReader {
       // skip packet with invalid header
       return Packet.NULL;
     }
-
-    // the pcap header for each packet contains a timestamp with the capture time of the packet
-    long packetTimestampSecs =
-        PcapReaderUtil.convertInt(pcapPacketHeader, TIMESTAMP_OFFSET, reverseHeaderByteOrder);
-    long packetTimestampMicros = PcapReaderUtil
-        .convertInt(pcapPacketHeader, TIMESTAMP_MICROS_OFFSET, reverseHeaderByteOrder);
 
     // decode the packet bytes
     Packet decodedPacket =

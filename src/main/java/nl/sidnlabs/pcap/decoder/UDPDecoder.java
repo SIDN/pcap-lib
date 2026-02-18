@@ -68,7 +68,7 @@ public class UDPDecoder implements Decoder {
     if (!isDNS(packet)) {
       // not a dns packet
       if (log.isDebugEnabled()) {
-        log.debug("Packet is not a DNS packet: " + packet);
+        log.debug("Packet is not a DNS packet: {}", packet);
       }
       return Packet.NULL;
     }
@@ -77,7 +77,7 @@ public class UDPDecoder implements Decoder {
     if (packetPayload.length == 0) {
       // no DNS packets found
       if (log.isDebugEnabled()) {
-        log.debug("No valid DNS packet found: " + packet);
+        log.debug("No valid DNS packet found: {}", packet);
       }
       return Packet.NULL;
     }
@@ -103,9 +103,9 @@ public class UDPDecoder implements Decoder {
 
   public void printStats() {
     log.info("------------- UDP Decoder Stats --------------------------");
-    log.info("Packets total: {}", Integer.valueOf(packetCounter));
-    log.info("Requests: {}", Integer.valueOf(reqCounter));
-    log.info("Responses: {}", Integer.valueOf(respCounter));
+    log.info("Packets total: {}", packetCounter);
+    log.info("Requests: {}", reqCounter);
+    log.info("Responses: {}", respCounter);
   }
 
   @Override

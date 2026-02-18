@@ -145,28 +145,4 @@ public class Packet {
   public long nextAck() {
     return tcpSeq + payloadLength;
   }
-
-  // public InetAddress getSrcAddr() {
-  // if (srcAddr == null) {
-  //
-  // }
-  // return srcAddr;
-  // }
-  //
-  // public InetAddress getDstAddr() {
-  // if (dstAddr == null) {
-  //
-  // }
-  // return dstAddr;
-  // }
-  //
-  // private InetAddress toInetAddress(String address) {
-  //
-  // try {
-  // return InetAddresses.toAddrString(dstAddr).forString(address);
-  // } catch (Exception e) {
-  // return null;
-  // }
-  // }
-
 }

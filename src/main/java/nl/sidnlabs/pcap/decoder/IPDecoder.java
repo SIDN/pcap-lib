@@ -24,8 +24,6 @@ import java.util.Collection;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
-import com.google.common.primitives.Bytes;
-
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -54,6 +52,8 @@ public class IPDecoder {
   public static final int IP_FLAGS = 6;
   public static final int IP_FRAGMENT_OFFSET = 6; // The first 3 bits are the flags
 
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+  
   private Multimap<Datagram, DatagramPayload> datagrams = TreeMultimap.create();
 
   private int counter;
@@ -95,16 +95,17 @@ public class IPDecoder {
     }
 
     // calc the timestamp in milliseconds = seconds + micros combined
-    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
+    packet.setTsMilli((packetTimestampSecs * 1000) + ((packetTimestampMicros + 500) / 1000));
     packet.setData(packetData);
     packet.setIpStart(ipStart);
 
 
     int ipProtocolHeaderVersion = IPv4Util.getInternetProtocolHeaderVersion(packetData, ipStart);
     packet.setIpVersion(ipProtocolHeaderVersion);
+    //packet.setIpVersion((int)packet.getProtocol()); 
 
     int totalLength = 0;
-    if (ipProtocolHeaderVersion == IP_PROTOCOL_VERSION_4) {
+    if (packet.getIpVersion() == IP_PROTOCOL_VERSION_4) {
       int ipHeaderLen = IPv4Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
       packet.setTtl(IPv4Util.decodeTTL(packetData, ipStart));
@@ -290,10 +291,12 @@ public class IPDecoder {
     datagrams.put(datagram, payload);
 
     if (packet.isLastFragment()) {
-      byte[] reassembledPacketData = new byte[0];
+      //byte[] reassembledPacketData = EMPTY_BYTE_ARRAY;
       // reassemble IP fragments
       Collection<DatagramPayload> datagramPayloads = datagrams.removeAll(datagram);
       if (datagramPayloads != null && !datagramPayloads.isEmpty()) {
+        
+        int totalSize = 0;
         int reassembledFragments = 0;
         DatagramPayload prev = null;
         for (DatagramPayload datagramPayload : datagramPayloads) {
@@ -304,7 +307,7 @@ public class IPDecoder {
                       "Datagram chain not starting at 0. Probably received packets out-of-order. Can't reassemble this packet.");
             }
             // do not even try to reassemble the data, probably corrupt packets.
-            return new byte[0];
+            return EMPTY_BYTE_ARRAY;
           }
           if (prev != null && !datagramPayload.linked(prev)) {
             if (log.isDebugEnabled()) {
@@ -313,21 +316,32 @@ public class IPDecoder {
                       + ". Can't reassemble this packet.");
             }
             // do not even try to reassemble the data, probably corrupt packets.
-            return new byte[0];
+            return EMPTY_BYTE_ARRAY;
           }
-          reassembledPacketData = Bytes.concat(reassembledPacketData, datagramPayload.getPayload());
+          
+          //reassembledPacketData = Bytes.concat(reassembledPacketData, datagramPayload.getPayload());
+
+          totalSize += datagramPayload.getPayload().length;
           reassembledFragments++;
           prev = datagramPayload;
         }
         packet.setReassembledFragments(reassembledFragments);
-      }
 
-      return reassembledPacketData;
+        //For reassembly, pre-calculate size:
+        byte[] reassembledPacketData = new byte[totalSize];
+        int offset = 0;
+        for (DatagramPayload dp : datagramPayloads) {
+            System.arraycopy(dp.getPayload(), 0, reassembledPacketData, offset, dp.getPayload().length);
+            offset += dp.getPayload().length;
+        }
+
+        return reassembledPacketData;
+      }
     }
 
     // need final IP fragment before continu to tcp/udp reassembly
     // until then return empty byte array
-    return new byte[0];
+    return EMPTY_BYTE_ARRAY;
   }
 
 }
