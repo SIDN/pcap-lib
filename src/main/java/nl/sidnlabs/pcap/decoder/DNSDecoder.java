@@ -96,10 +96,4 @@ public class DNSDecoder {
     messageCounter = 0;
   }
 
-  public void printStats() {
-    log.info("---------------- DNS decoder stats -----------------------");
-    log.info("Messages: {}", Integer.valueOf(messageCounter));
-    log.info("Errors: {}", Integer.valueOf(messageDecodeError));
-  }
-
 }

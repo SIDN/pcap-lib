@@ -21,31 +21,21 @@ package nl.sidnlabs.pcap.packet;
 
 import java.util.ArrayList;
 import java.util.List;
-import lombok.NoArgsConstructor;
+
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import nl.sidnlabs.dnslib.message.Message;
 
 @Value
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper=true)
 public class DNSPacket extends Packet {
 
   // dns messages
+  @EqualsAndHashCode.Exclude
   private List<Message> messages = new ArrayList<>();
 
   public DNSPacket(byte protocol) {
     super(protocol);
-  }
-
-  /**
-   * get dns message from packet
-   *
-   * @return first message in list, null if no message was found
-   */
-  public Message getMessage() {
-    if (!messages.isEmpty()) {
-      return messages.get(0);
-    }
-    return null;
   }
 
   public void pushMessage(Message msg) {

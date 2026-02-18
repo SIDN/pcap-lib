@@ -20,6 +20,7 @@
 package nl.sidnlabs.pcap.packet;
 
 import java.net.InetAddress;
+
 import lombok.Getter;
 import lombok.Setter;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
@@ -144,5 +145,57 @@ public class Packet {
    */
   public long nextAck() {
     return tcpSeq + payloadLength;
+  }
+
+  @Override
+  public int hashCode() {
+    final int prime = 31;
+    int result = 1;
+    result = prime * result + (int) (tsMilli ^ (tsMilli >>> 32));
+    result = prime * result + (int) (ipId ^ (ipId >>> 32));
+    result = prime * result + ttl;
+    result = prime * result + ipVersion;
+    result = prime * result + protocol;
+    result = prime * result + ((src == null) ? 0 : src.hashCode());
+    result = prime * result + ((dst == null) ? 0 : dst.hashCode());
+    result = prime * result + srcPort;
+    result = prime * result + dstPort;
+    return result;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj)
+      return true;
+    if (obj == null)
+      return false;
+    if (getClass() != obj.getClass())
+      return false;
+    Packet other = (Packet) obj;
+    if (tsMilli != other.tsMilli)
+      return false;
+    if (ipId != other.ipId)
+      return false;
+    if (ttl != other.ttl)
+      return false;
+    if (ipVersion != other.ipVersion)
+      return false;
+    if (protocol != other.protocol)
+      return false;
+    if (src == null) {
+      if (other.src != null)
+        return false;
+    } else if (!src.equals(other.src))
+      return false;
+    if (dst == null) {
+      if (other.dst != null)
+        return false;
+    } else if (!dst.equals(other.dst))
+      return false;
+    if (srcPort != other.srcPort)
+      return false;
+    if (dstPort != other.dstPort)
+      return false;
+    return true;
   }
 }

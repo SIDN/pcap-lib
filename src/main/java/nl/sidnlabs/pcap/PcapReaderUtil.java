@@ -90,10 +90,6 @@ public class PcapReaderUtil {
          | ((long)(data[offset + 3] & 0xFF));
   }
 
-  // public static String convertProtocolIdentifier(int identifier) {
-  // return protocols.get(identifier);
-  // }
-
   public static InetAddress convertDataToInetAddress(byte[] data, int offset, int size) {
     // Optimized: InetAddress.getByAddress can accept array slice via offset parameter
     // However, the API doesn't support offset, so we still need the copy

@@ -42,6 +42,7 @@ public class TCPFlow implements Comparable<TCPFlow> {
     this.protocol = protocol;
   }
 
+  @SuppressWarnings("null")
   @Override
   public int compareTo(TCPFlow o) {
     return ComparisonChain

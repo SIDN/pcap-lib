@@ -48,10 +48,6 @@ public class TCPDecoder implements Decoder {
   private static final int PROTOCOL_HEADER_TCP_ACK_OFFSET = 8;
   private static final int TCP_HEADER_DATA_OFFSET = 12;
   private static final int PROTOCOL_HEADER_WINDOW_SIZE_OFFSET = 14;
-//  private static final int PROTOCOL_HEADER_OPTIONS_OFFSET = 20;
-//  // last 5 bits of the 1st byte of the option are for the option number
-//  private static final int PROTOCOL_HEADER_OPTION_LEN_MASK = 0b00011111;
-//  private static final int PROTOCOL_HEADER_OPTION_TIMESTAMP = 8;
 
   private static final int TCP_DNS_LENGTH_PREFIX = 2;
 

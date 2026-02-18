@@ -748,8 +748,7 @@ public class ChainBuffer implements Buffer {
 
   @Override
   public Buffer duplicate() {
-    // TODO
-    return null;
+    throw new UnsupportedOperationException("duplicate() is not supported in ChainBuffer");
   }
 
   @Override

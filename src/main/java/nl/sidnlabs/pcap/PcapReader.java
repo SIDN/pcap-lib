@@ -23,7 +23,6 @@ import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -36,9 +35,7 @@ import nl.sidnlabs.pcap.decoder.ICMPDecoder;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 import nl.sidnlabs.pcap.decoder.TCPDecoder;
 import nl.sidnlabs.pcap.decoder.UDPDecoder;
-import nl.sidnlabs.pcap.packet.FlowData;
 import nl.sidnlabs.pcap.packet.Packet;
-import nl.sidnlabs.pcap.packet.TCPFlow;
 
 /**
  * Read all data from a pcap file and decode all the packets
@@ -80,23 +77,14 @@ public class PcapReader {
   // Reusable buffer for packet headers to avoid millions of allocations
   private final byte[] packetHeaderBuffer = new byte[PACKET_HEADER_SIZE];
 
-  public PcapReader(DataInputStream is, IPDecoder ipDecoder, boolean tcpEnabled, boolean partial) throws IOException {
+  public PcapReader(DataInputStream is, boolean partial) throws IOException {
 
     this.is = is;
     this.partial = partial;
 
-    if (ipDecoder != null) {
-      this.ipDecoder = ipDecoder;
-    } else {
-      DNSDecoder dnsDecoder = new DNSDecoder(false, partial);
-
-      TCPDecoder tcpDecoder = null;
-      if (tcpEnabled) {
-        tcpDecoder = new TCPDecoder(dnsDecoder);
-      }
-
-      this.ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(dnsDecoder), new ICMPDecoder());
-    }
+    DNSDecoder dnsDecoder = new DNSDecoder(false, partial);
+    TCPDecoder tcpDecoder = new TCPDecoder(dnsDecoder);
+    this.ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(dnsDecoder), new ICMPDecoder());
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
     if (!readBytes(pcapHeader)) {
@@ -237,9 +225,7 @@ public class PcapReader {
     return -1;
   }
 
-
-
-  protected boolean readBytes(byte[] buf) {
+  private boolean readBytes(byte[] buf) {
     try {
       is.readFully(buf);
       return true;
@@ -247,18 +233,11 @@ public class PcapReader {
       // Reached the end of the stream
       caughtEOF = true;
     } catch (IOException e) {
-      throw new PcapReaderException("Error while reading " + buf.length + " bytes from buffer");
+      log.error("Error while reading " + buf.length + " bytes from buffer", e);
     }
 
     return false;
   }
-
-  public void setTcpFlows(Map<TCPFlow, FlowData> flows) {
-    if (ipDecoder.getTcpReader() != null && ipDecoder.getTcpReader() instanceof TCPDecoder) {
-      ((TCPDecoder) ipDecoder.getTcpReader()).setFlows(flows);
-    }
-  }
-
   private class PacketIterator implements Iterator<Packet> {
     private Packet next;
 
@@ -266,12 +245,7 @@ public class PcapReader {
       // skip fragmented packets until they are assembled
       if (next == null) {
         do {
-        //try {
           next = nextPacket();
-       // } catch (Exception e) {
-       //   log.error("PCAP decode error: ", e);
-       //   next = Packet.NULL;
-       // }
       } while (next == Packet.NULL);
       }
     }
