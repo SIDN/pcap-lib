@@ -598,15 +598,6 @@ public class TCPDecoder implements Decoder {
     expiredList.forEach(this::removeFlow);
   }
 
-  public void printStats() {
-    log.info("---------------------- TCP Decoder Stats -----------------");
-    log.info("Packets total: {}", packetCounter);
-    log.info("Request: {}", reqPacketCounter);
-    log.info("Response: {}", rspPacketCounter);
-    log.info("DNS replies: {}", dnsRspMsgCounter);
-    log.info("DNS queries: {}", dnsReqMsgCounter);
-  }
-
   @Override
   public void reset() {
     packetCounter = 0;

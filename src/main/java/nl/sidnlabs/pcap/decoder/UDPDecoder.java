@@ -100,14 +100,6 @@ public class UDPDecoder implements Decoder {
     return PcapReaderUtil.readPayload(packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
   }
 
-
-  public void printStats() {
-    log.info("------------- UDP Decoder Stats --------------------------");
-    log.info("Packets total: {}", packetCounter);
-    log.info("Requests: {}", reqCounter);
-    log.info("Responses: {}", respCounter);
-  }
-
   @Override
   public void reset() {
     packetCounter = 0;

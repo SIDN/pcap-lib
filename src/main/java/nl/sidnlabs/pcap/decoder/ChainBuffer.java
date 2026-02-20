@@ -19,6 +19,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.BufferUnderflowException;
 import java.nio.InvalidMarkException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -437,7 +438,7 @@ public class ChainBuffer implements Buffer {
     byte[] str = new byte[length];
     try {
       gets(str, 0, length);
-      return new String(str);
+      return new String(str, StandardCharsets.US_ASCII);
     } catch (BufferUnderflowException e) {
       throw e;
     }
@@ -452,7 +453,7 @@ public class ChainBuffer implements Buffer {
     } catch (BufferUnderflowException e) {
       throw e;
     } catch (UnsupportedEncodingException e) {
-      return new String(str);
+      return new String(str, StandardCharsets.US_ASCII);
     }
   }
 

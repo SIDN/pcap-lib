@@ -71,17 +71,6 @@ public class IPDecoder {
     this.icmpDecoder = icmpDecoder;
   }
 
-  public void printStats() {
-    log.info("------------- IP Decoder Stats --------------------------");
-    log.info("Packets total: {}", Integer.valueOf(counter));
-    log.info("Packets payload: {}", Integer.valueOf(counterPayload));
-
-    udpReader.printStats();
-    if (tcpReader != null) {
-      tcpReader.printStats();
-    }
-  }
-
   public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
       long packetTimestampMicros, boolean partial) {
     counter++;
@@ -95,17 +84,16 @@ public class IPDecoder {
     }
 
     // calc the timestamp in milliseconds = seconds + micros combined
-    packet.setTsMilli((packetTimestampSecs * 1000) + ((packetTimestampMicros + 500) / 1000));
+    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
     packet.setData(packetData);
     packet.setIpStart(ipStart);
 
 
     int ipProtocolHeaderVersion = IPv4Util.getInternetProtocolHeaderVersion(packetData, ipStart);
     packet.setIpVersion(ipProtocolHeaderVersion);
-    //packet.setIpVersion((int)packet.getProtocol()); 
 
     int totalLength = 0;
-    if (packet.getIpVersion() == IP_PROTOCOL_VERSION_4) {
+    if (ipProtocolHeaderVersion == IP_PROTOCOL_VERSION_4) {
       int ipHeaderLen = IPv4Util.getInternetProtocolHeaderLength(packetData, ipStart);
       packet.setIpHeaderLen(ipHeaderLen);
       packet.setTtl(IPv4Util.decodeTTL(packetData, ipStart));

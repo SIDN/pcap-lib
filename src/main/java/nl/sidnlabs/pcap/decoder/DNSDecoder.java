@@ -77,7 +77,8 @@ public class DNSDecoder {
         // reuse existing data object, no need to allocate new memory
         networkData.update(payload, offset, length);
       }
-      dnsPacket.pushMessage(new Message(networkData, partial, allowFail));
+      Message msg = new Message(networkData, partial, allowFail);
+      dnsPacket.pushMessage(msg);
       messageCounter++;
     } catch (Exception e) {
       if (!allowFail) {
