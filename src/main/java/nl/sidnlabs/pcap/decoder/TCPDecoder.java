@@ -53,6 +53,10 @@ public class TCPDecoder implements Decoder {
 
   private static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.allocate(0);
 
+  private static final int CACHE_SWEEP_INTERVAL = 20_000;
+  // TTL for incomplete TCP flows / handshakes: 60 seconds in milliseconds
+  private static final int FLOW_CACHE_TTL_MS = 60_000;
+
   private DNSDecoder dnsDecoder;
 
   private Map<TCPFlow, FlowData> flows = new HashMap<>();
@@ -104,6 +108,10 @@ public class TCPDecoder implements Decoder {
 
     packetPayload = decode(packet, packetData);
     lastPacketTs = packet.getTsMilli();
+
+    if (packetCounter % CACHE_SWEEP_INTERVAL == 0) {
+      clearCache(FLOW_CACHE_TTL_MS);
+    }
 
     if (!isDNS(packet)) {
       // not a dns packet, ignore
@@ -577,25 +585,36 @@ public class TCPDecoder implements Decoder {
   }
 
   public void clearCache(int cacheTTL) {
-    // clear tcp flows with expired packets
-    List<TCPFlow> expiredList = new ArrayList<>();
     long max = lastPacketTs - cacheTTL;
+
+    // clear tcp flows with expired packets
+    List<TCPFlow> expiredFlows = new ArrayList<>();
     for (Entry<TCPFlow, FlowData> entry : flows.entrySet()) {
       // if 1 payload is expired then remove entire flow.
       for (SequencePayload sequencePayload : entry.getValue().getPayloads()) {
         if ((sequencePayload.getTime()) < max) {
-          expiredList.add(entry.getKey());
+          expiredFlows.add(entry.getKey());
           break;
         }
       }
     }
 
-    log.info("------------- TCP Decoder Cache Stats --------------------");
-    log.info("TCP flow cache size: {}", flows.size());
-    log.info("Expired (to be removed) TCP flows: {}", expiredList.size());
+    // clear incomplete handshakes that are older than the TTL
+    List<TCPFlow> expiredHandshakes = new ArrayList<>();
+    for (Entry<TCPFlow, TcpHandshake> entry : handshakes.entrySet()) {
+      if (entry.getValue().getSynTs() < max) {
+        expiredHandshakes.add(entry.getKey());
+      }
+    }
 
-    // remove flows with expired packets
-    expiredList.forEach(this::removeFlow);
+    if(log.isDebugEnabled()) {
+      log.debug("------------- TCP Decoder Cache Stats --------------------");
+      log.debug("TCP flow cache size: {}, expired: {}", flows.size(), expiredFlows.size());
+      log.debug("TCP handshake cache size: {}, expired: {}", handshakes.size(), expiredHandshakes.size());
+    }
+  
+    expiredFlows.forEach(this::removeFlow);
+    expiredHandshakes.forEach(handshakes::remove);
   }
 
   @Override

@@ -31,7 +31,6 @@ import nl.sidnlabs.pcap.PcapReaderUtil;
 import nl.sidnlabs.pcap.packet.DNSPacket;
 import nl.sidnlabs.pcap.packet.Datagram;
 import nl.sidnlabs.pcap.packet.DatagramPayload;
-import nl.sidnlabs.pcap.packet.ICMPPacket;
 import nl.sidnlabs.pcap.packet.Packet;
 import nl.sidnlabs.pcap.packet.PacketFactory;
 import nl.sidnlabs.pcap.util.IPv4Util;
@@ -60,15 +59,13 @@ public class IPDecoder {
   private int counterPayload;
   private Decoder tcpReader;
   private Decoder udpReader;
-  private ICMPDecoder icmpDecoder;
 
   private long lastPacketTs;
 
 
-  public IPDecoder(Decoder tcpReader, Decoder udpReader, ICMPDecoder icmpDecoder) {
+  public IPDecoder(Decoder tcpReader, Decoder udpReader) {
     this.tcpReader = tcpReader;
     this.udpReader = udpReader;
-    this.icmpDecoder = icmpDecoder;
   }
 
   public Packet decode(byte[] packetData, int ipStart, long packetTimestampSecs,
@@ -202,16 +199,6 @@ public class IPDecoder {
 
   
   private Packet handlePayload(Packet packet, byte[] packetData) {
-
-    if ((PacketFactory.PROTOCOL_ICMP_V4 == packet.getProtocol())
-        || (PacketFactory.PROTOCOL_ICMP_V6 == packet.getProtocol())) {
-
-      // found icmp protocol
-      icmpDecoder.reassemble((ICMPPacket) packet, packetData);
-      // do not process icmp packet further, because the dns packet might be corrupt (only 8 bytes
-      // in icmp packet)
-      return packet;
-    }
 
     if (PacketFactory.PROTOCOL_TCP == packet.getProtocol()) {
       // found TCP protocol

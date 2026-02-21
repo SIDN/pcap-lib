@@ -31,7 +31,6 @@ import org.apache.commons.codec.binary.Hex;
 
 import lombok.extern.log4j.Log4j2;
 import nl.sidnlabs.pcap.decoder.DNSDecoder;
-import nl.sidnlabs.pcap.decoder.ICMPDecoder;
 import nl.sidnlabs.pcap.decoder.IPDecoder;
 import nl.sidnlabs.pcap.decoder.TCPDecoder;
 import nl.sidnlabs.pcap.decoder.UDPDecoder;
@@ -84,7 +83,7 @@ public class PcapReader {
 
     DNSDecoder dnsDecoder = new DNSDecoder(false, partial);
     TCPDecoder tcpDecoder = new TCPDecoder(dnsDecoder);
-    this.ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(dnsDecoder), new ICMPDecoder());
+    this.ipDecoder = new IPDecoder(tcpDecoder, new UDPDecoder(dnsDecoder));
 
     byte[] pcapHeader = new byte[HEADER_SIZE];
     if (!readBytes(pcapHeader)) {

@@ -73,8 +73,8 @@ public class UDPDecoder implements Decoder {
       return Packet.NULL;
     }
 
-    byte[] packetPayload = decode(packetData);
-    if (packetPayload.length == 0) {
+    int payloadLength = packetData.length - UDPUtil.UDP_HEADER_SIZE;
+    if (payloadLength <= 0) {
       // no DNS packets found
       if (log.isDebugEnabled()) {
         log.debug("No valid DNS packet found: {}", packet);
@@ -92,12 +92,9 @@ public class UDPDecoder implements Decoder {
     packet.setLen(packetData.length);
     packet.setPayloadLength(UDPUtil.getUdpLen(packetData));
 
-    return dnsDecoder.decode((DNSPacket) packet, packetPayload, 0, packetPayload.length);
-  }
-
-  public byte[] decode(byte[] packetData) {
-    int payloadLength = packetData.length - UDPUtil.UDP_HEADER_SIZE;
-    return PcapReaderUtil.readPayload(packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
+    // Pass the original buffer with offset directly - avoids allocating a new byte[] copy
+    // for every UDP DNS packet (the dominant case in pcap traffic).
+    return dnsDecoder.decode((DNSPacket) packet, packetData, UDPUtil.UDP_HEADER_SIZE, payloadLength);
   }
 
   @Override

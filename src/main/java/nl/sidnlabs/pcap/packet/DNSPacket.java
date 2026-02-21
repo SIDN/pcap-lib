@@ -30,9 +30,11 @@ import nl.sidnlabs.dnslib.message.Message;
 @EqualsAndHashCode(callSuper=true)
 public class DNSPacket extends Packet {
 
-  // dns messages
+  // dns messages - almost always exactly 1 message per packet; capacity 1 avoids
+  // an internal array resize on the common path while multi-message TCP payloads
+  // still grow correctly.
   @EqualsAndHashCode.Exclude
-  private List<Message> messages = new ArrayList<>();
+  private List<Message> messages = new ArrayList<>(1);
 
   public DNSPacket(byte protocol) {
     super(protocol);
