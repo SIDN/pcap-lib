@@ -344,43 +344,6 @@ public class TCPDecoder implements Decoder {
 
   }
 
-  // OLD TCP options decode code, leave for now as an example for when we might
-  // want to do something with the tcp options
-  // /**
-  // * try to locate and decode the timestamp option
-  // *
-  // * @param packet the current packet
-  // * @param packetData the current packet data
-  // * @param tcpHeaderSize the tcp header size
-  // */
-  // private void decodeOptions(Packet packet, byte[] packetData, int tcpHeaderSize) {
-  // if (tcpHeaderSize > PROTOCOL_HEADER_OPTIONS_OFFSET) {
-  // // tcp header is > 20 bytes, meanign there are tcp options present
-  // int pos = PROTOCOL_HEADER_OPTIONS_OFFSET;
-  // int option = -1;
-  // // scan through options until reached end of options or end-options found or
-  // // timestamp options found
-  // while (pos < tcpHeaderSize && option != 0) {
-  // option = PROTOCOL_HEADER_OPTION_LEN_MASK & (0xFF & packetData[pos++]);
-  // // option 0 and 1 do not have length field
-  // if (option > 1) {
-  // int len = 0xFF & packetData[pos++];
-  // if (option == PROTOCOL_HEADER_OPTION_TIMESTAMP) {
-  // byte[] ts = new byte[4];
-  // System.arraycopy(packetData, pos, ts, 0, ts.length);
-  // packet.setTcpOptionTSval(readUnsignedInt(ts));
-  // System.arraycopy(packetData, pos + 4, ts, 0, ts.length);
-  // packet.setTcpOptionTSecr(readUnsignedInt(ts));
-  // // stop processing options, only interested in the TS option
-  // break;
-  // }
-  // // goto to next option postion
-  // pos += (len - 2);
-  // }
-  // }
-  // }
-  // }
-
   public long readUnsignedInt(byte[] buf) {
     // Optimized: direct bit manipulation instead of intermediate int variables
     return ((long) (buf[0] & 0xFF) << 24 | (buf[1] & 0xFF) << 16 | (buf[2] & 0xFF) << 8 | (buf[3] & 0xFF)) & 0xFFFFFFFFL;
