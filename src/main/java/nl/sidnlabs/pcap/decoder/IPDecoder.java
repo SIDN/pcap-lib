@@ -81,7 +81,7 @@ public class IPDecoder {
     }
 
     // calc the timestamp in milliseconds = seconds + micros combined
-    packet.setTsMilli((packetTimestampSecs * 1000) + Math.round(packetTimestampMicros / 1000f));
+    packet.setTsMicros(packetTimestampSecs * 1_000_000L + packetTimestampMicros);
     packet.setData(packetData);
     packet.setIpStart(ipStart);
 
@@ -137,7 +137,7 @@ public class IPDecoder {
     packet.setTotalLength(totalLength);
 
     // keep last packet time for cache timing
-    lastPacketTs = packet.getTsMilli();
+    lastPacketTs = packet.getTsMicros();
 
     // return fully decoded packet
     return decode(packet, packetData, ipStart);

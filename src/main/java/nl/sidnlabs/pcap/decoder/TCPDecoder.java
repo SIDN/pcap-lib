@@ -107,7 +107,7 @@ public class TCPDecoder implements Decoder {
     }
 
     packetPayload = decode(packet, packetData);
-    lastPacketTs = packet.getTsMilli();
+    lastPacketTs = packet.getTsMicros();
 
     if (packetCounter % CACHE_SWEEP_INTERVAL == 0) {
       clearCache(FLOW_CACHE_TTL_MS);
@@ -159,7 +159,7 @@ public class TCPDecoder implements Decoder {
       byte[] bytes = new byte[packetPayload.limit()];
       packetPayload.get(bytes);
       SequencePayload sequencePayload =
-          new SequencePayload(packet.getTcpSeq(), bytes, packet.getTsMilli(), flow);
+          new SequencePayload(packet.getTcpSeq(), bytes, packet.getTsMicros(), flow);
 
       if (log.isDebugEnabled()) {
         log.debug("reassemble, tcp bytes len: {}", packetPayload.limit());
@@ -420,7 +420,7 @@ public class TCPDecoder implements Decoder {
       }
       // this is a client syn for a new TCP connection, create handshake and return
       TcpHandshake handshake = new TcpHandshake(packet.getTcpSeq());
-      handshake.setSynTs(packet.getTsMilli());
+      handshake.setSynTs(packet.getTsMicros());
       handshakes.put(packet.getFlow(), handshake);
       return true;
     }
@@ -457,7 +457,7 @@ public class TCPDecoder implements Decoder {
       if (handshake != null && HANDSHAKE_STATE.SYN_ACK_SENT == handshake.getState()
           && packet.getTcpAck() - 1 == handshake.getServerSynSeq()) {
         // state and seq number match, got final ack for the handshake, connection complete
-        handshake.setAckTs(packet.getTsMilli());
+        handshake.setAckTs(packet.getTsMicros());
         handshake.setState(HANDSHAKE_STATE.ACK_RECV);
         handshake.setClientAckSeq(packet.getTcpSeq());
         // check for PSH flag

@@ -45,7 +45,7 @@ public class Packet {
   // network
   protected int len;
   // time in millis when packet was sent ( tsSec + tsmicros)
-  protected long tsMilli;
+  protected long tsMicros;
   // ip
   protected long ipId;
   protected int ttl;
@@ -126,7 +126,7 @@ public class Packet {
 
   public Datagram getDatagram() {
     return new Datagram(getSrc(), getDst(), Long.valueOf(getIpId()), String.valueOf(getProtocol()),
-        getTsMilli());
+        getTsMicros());
   }
 
 
@@ -151,7 +151,7 @@ public class Packet {
   public int hashCode() {
     final int prime = 31;
     int result = 1;
-    result = prime * result + (int) (tsMilli ^ (tsMilli >>> 32));
+    result = prime * result + (int) (tsMicros ^ (tsMicros >>> 32));
     result = prime * result + (int) (ipId ^ (ipId >>> 32));
     result = prime * result + ttl;
     result = prime * result + ipVersion;
@@ -172,7 +172,7 @@ public class Packet {
     if (getClass() != obj.getClass())
       return false;
     Packet other = (Packet) obj;
-    if (tsMilli != other.tsMilli)
+    if (tsMicros != other.tsMicros)
       return false;
     if (ipId != other.ipId)
       return false;
