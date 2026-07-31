@@ -3,11 +3,11 @@
 
 	<groupId>nl.sidnlabs</groupId>
 	<artifactId>pcap-lib</artifactId>
-	<version>0.2.27-SNAPSHOT</version>
+	<version>0.2.27</version>
 
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>PCAP library</description>
-	<url>https://github.com/SIDN/dnslib</url>
+	<url>https://github.com/SIDN/pcap-lib</url>
 
 	<licenses>
 		<license>
@@ -29,7 +29,7 @@
 		<connection>scm:git:ssh://github.com/SIDN/pcap-lib.git</connection>
 		<developerConnection>scm:git:ssh://github.com/SIDN/pcap-lib.git</developerConnection>
 		<url>https://github.com/SIDN/pcap-lib/tree/master/</url>
-		<tag>pcap-lib-0.2.25</tag>
+		<tag>pcap-lib-0.2.27</tag>
 	</scm>
 
 	<properties>
@@ -37,7 +37,7 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<project.scm.id>github-server</project.scm.id>
 		<java.version>25</java.version>
-		<lombok.version>1.18.42</lombok.version>
+		<lombok.version>1.18.46</lombok.version>
 		<maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
 	</properties>
@@ -53,7 +53,7 @@
 		<dependency>
 			<groupId>nl.sidnlabs</groupId>
 			<artifactId>dnslib</artifactId>
-			<version>0.2.20-SNAPSHOT</version>
+			<version>0.2.20</version>
 		</dependency>
 
 		<dependency>
