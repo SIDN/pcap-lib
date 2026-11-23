@@ -19,6 +19,7 @@
  */
 package nl.sidnlabs.pcap;
 
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -41,7 +42,7 @@ import nl.sidnlabs.pcap.packet.Packet;
  *
  */
 @Log4j2
-public class PcapReader {
+public class PcapReader implements Closeable {
 
   // needs no explanation
   public static final int DNS_PORT = 53;
@@ -118,6 +119,11 @@ public class PcapReader {
     return PacketIterator::new;
   }
 
+  @Override
+  public void close() throws IOException {
+    // releases the underlying decompressor (e.g. native zstd buffers) back to its pool
+    is.close();
+  }
 
   private Packet nextPacket() {
     // Reuse instance buffer instead of allocating new array each time
